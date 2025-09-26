@@ -1,0 +1,13 @@
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-container {
+  display: flex;
+  height: calc(100vh - 80px);
+  gap: 1rem;
+  padding: 1rem;
+}
+

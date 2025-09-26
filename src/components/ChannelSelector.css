@@ -1,0 +1,116 @@
+.channel-dropdown {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.dropdown-button {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  border-radius: 6px;
+  color: #e0e6ed;
+  padding: 0.8rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.dropdown-button:hover {
+  border-color: #40e0d0;
+  background: rgba(64, 224, 208, 0.05);
+}
+
+.dropdown-button.open {
+  border-color: #40e0d0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.dropdown-arrow {
+  transition: transform 0.2s ease;
+}
+
+.dropdown-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: rgba(30, 30, 60, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  max-height: 500px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.dropdown-menu.hidden {
+  display: none;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(64, 224, 208, 0.1);
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item:hover {
+  background: rgba(64, 224, 208, 0.1);
+}
+
+.channel-checkbox {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #40e0d0;
+  border-radius: 3px;
+  position: relative;
+  background: transparent;
+  flex-shrink: 0;
+}
+
+.channel-checkbox.checked {
+  background: linear-gradient(135deg, #40e0d0, #00bcd4);
+}
+
+.channel-checkbox.checked::after {
+  content: '✓';
+  position: absolute;
+  top: -2px;
+  left: 2px;
+  color: #0f0f23;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.channel-info {
+  flex: 1;
+}
+
+.channel-name {
+  font-weight: 500;
+  color: #e0e6ed;
+}
+
+.channel-description {
+  font-size: 0.8rem;
+  color: rgba(224, 230, 237, 0.6);
+  margin-top: 0.1rem;
+}
+

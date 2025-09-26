@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spike Visualization Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #e0e6ed;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .header {
+            background: rgba(30, 30, 60, 0.9);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(64, 224, 208, 0.3);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            color: #40e0d0;
+            font-size: 1.5rem;
+            font-weight: 600;
+            text-shadow: 0 0 10px rgba(64, 224, 208, 0.5);
+        }
+
+        .data-info {
+            background: rgba(64, 224, 208, 0.1);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .data-size {
+            color: #40e0d0;
+            font-weight: 600;
+        }
+
+        .main-container {
+            display: flex;
+            height: calc(100vh - 80px);
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: rgba(30, 30, 60, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(64, 224, 208, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .control-group {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            border: 1px solid rgba(64, 224, 208, 0.1);
+        }
+
+        .control-group h3 {
+            color: #40e0d0;
+            font-size: 1rem;
+            margin-bottom: 0.8rem;
+            font-weight: 500;
+        }
+
+        .channel-dropdown {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .dropdown-button {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-radius: 6px;
+            color: #e0e6ed;
+            padding: 0.8rem 1rem;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-button:hover {
+            border-color: #40e0d0;
+            background: rgba(64, 224, 208, 0.05);
+        }
+
+        .dropdown-button.open {
+            border-color: #40e0d0;
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .dropdown-arrow {
+            transition: transform 0.2s ease;
+        }
+
+        .dropdown-arrow.rotated {
+            transform: rotate(180deg);
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(30, 30, 60, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-top: none;
+            border-radius: 0 0 6px 6px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 1000;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .dropdown-menu.hidden {
+            display: none;
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid rgba(64, 224, 208, 0.1);
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(64, 224, 208, 0.1);
+        }
+
+        .channel-checkbox {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #40e0d0;
+            border-radius: 3px;
+            position: relative;
+            background: transparent;
+            flex-shrink: 0;
+        }
+
+        .channel-checkbox.checked {
+            background: linear-gradient(135deg, #40e0d0, #00bcd4);
+        }
+
+        .channel-checkbox.checked::after {
+            content: '✓';
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            color: #0f0f23;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .channel-info {
+            flex: 1;
+        }
+
+        .channel-name {
+            font-weight: 500;
+            color: #e0e6ed;
+        }
+
+        .channel-description {
+            font-size: 0.8rem;
+            color: rgba(224, 230, 237, 0.6);
+            margin-top: 0.1rem;
+        }
+
+        .visualization-area {
+            flex: 1;
+            background: rgba(30, 30, 60, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(64, 224, 208, 0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .viz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(64, 224, 208, 0.2);
+        }
+
+        .time-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .time-input {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-radius: 6px;
+            color: #e0e6ed;
+            padding: 0.4rem 0.8rem;
+            font-size: 0.9rem;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: #40e0d0;
+            box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
+        }
+
+        .spike-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr;
+            grid-template-rows: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .spike-channel {
+            background: rgba(10, 10, 30, 0.8);
+            border: 1px solid rgba(64, 224, 208, 0.1);
+            border-radius: 8px;
+            padding: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .channel-label {
+            position: absolute;
+            top: 0.5rem;
+            left: 0.5rem;
+            background: rgba(64, 224, 208, 0.2);
+            color: #40e0d0;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            z-index: 2;
+        }
+
+        .spike-waveform {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .graph-container {
+            width: 100%;
+            height: 80%;
+            position: relative;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .graph-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .x-axis {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: rgba(64, 224, 208, 0.3);
+        }
+
+        .y-axis {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: rgba(64, 224, 208, 0.3);
+        }
+
+        .x-labels {
+            position: absolute;
+            bottom: -20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            color: rgba(224, 230, 237, 0.6);
+        }
+
+        .timeline {
+            height: 60px;
+            background: rgba(10, 10, 30, 0.9);
+            border: 1px solid rgba(64, 224, 208, 0.2);
+            border-radius: 8px;
+            position: relative;
+            margin-top: auto;
+            overflow: hidden;
+        }
+
+        .timeline-track {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, 
+                rgba(64, 224, 208, 0.2) 0%, 
+                rgba(64, 224, 208, 0.6) 50%, 
+                rgba(64, 224, 208, 0.2) 100%);
+            transform: translateY(-2px);
+        }
+
+        .timeline-cursor {
+            position: absolute;
+            top: 10px;
+            bottom: 10px;
+            width: 2px;
+            background: #ff6b6b;
+            left: 0%;
+            box-shadow: 0 0 10px rgba(255, 107, 107, 0.8);
+            animation: glow 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 10px rgba(255, 107, 107, 0.8); }
+            to { box-shadow: 0 0 20px rgba(255, 107, 107, 1); }
+        }
+
+        .timeline-labels {
+            position: absolute;
+            bottom: 5px;
+            left: 1rem;
+            right: 1rem;
+            display: flex;
+            justify-content: space-between;
+            color: rgba(224, 230, 237, 0.6);
+            font-size: 0.7rem;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #40e0d0, #00bcd4);
+            border: none;
+            color: #0f0f23;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(64, 224, 208, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .stats-panel {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(30, 30, 60, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(64, 224, 208, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            min-width: 200px;
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .stat-label {
+            color: rgba(224, 230, 237, 0.7);
+        }
+
+        .stat-value {
+            color: #40e0d0;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Spike Visualization Dashboard</h1>
+        <div class="data-info">
+            <span>385 channels</span>
+            <span>|</span>
+            <span>Active</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="control-group">
+                <h3>Channel Selection</h3>
+                <div class="channel-dropdown">
+                    <button class="dropdown-button" onclick="toggleDropdown()">
+                        <span>Select Channels (3/385)</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="dropdown-menu hidden" id="channelDropdown">
+                        <div class="dropdown-item" onclick="toggleChannel(this, 'CH1')">
+                            <div class="channel-checkbox checked"></div>
+                            <div class="channel-info">
+                                <div class="channel-name">CH1</div>
+                                <div class="channel-description">Motor Cortex</div>
+                            </div>
+                        </div>
+                        <div class="dropdown-item" onclick="toggleChannel(this, 'CH2')">
+                            <div class="channel-checkbox checked"></div>
+                            <div class="channel-info">
+                                <div class="channel-name">CH2</div>
+                                <div class="channel-description">Sensory</div>
+                            </div>
+                        </div>
+                        <div class="dropdown-item" onclick="toggleChannel(this, 'CH3')">
+                            <div class="channel-checkbox"></div>
+                            <div class="channel-info">
+                                <div class="channel-name">CH3</div>
+                                <div class="channel-description">Visual</div>
+                            </div>
+                        </div>
+                        <div class="dropdown-item" style="pointer-events: none; opacity: 0.6;">
+                            <div class="channel-info" style="text-align: center; width: 100%;">
+                                <div class="channel-name" style="color: rgba(224, 230, 237, 0.7);">...</div>
+                                <div class="channel-description">More channels coming soon</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>Actions</h3>
+                <button class="btn" onclick="refreshData()">Refresh Data</button>
+            </div>
+        </div>
+
+        <div class="visualization-area">
+            <div class="viz-header">
+                <h2 style="color: #40e0d0;">Raw Data Visualization</h2>
+                <div class="time-controls">
+                    <label style="color: rgba(224, 230, 237, 0.7);">Time Range:</label>
+                    <input type="text" class="time-input" value="5.00s" placeholder="Start">
+                    <span style="color: rgba(224, 230, 237, 0.5);">to</span>
+                    <input type="text" class="time-input" value="15.00s" placeholder="End">
+                </div>
+            </div>
+
+            <div class="spike-grid">
+                <div class="spike-channel">
+                    <div class="channel-label">CH1</div>
+                    <div class="spike-waveform">
+                        <div class="graph-container">
+                            <div class="x-axis"></div>
+                            <div class="y-axis"></div>
+                            <svg class="graph-line" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                <polyline fill="none" stroke="#40e0d0" stroke-width="0.5" 
+                                         points="0,50 10,30 20,70 30,20 40,80 50,15 60,85 70,25 80,75 90,35 100,60"
+                                         opacity="0.9"/>
+                            </svg>
+                        </div>
+                        <div class="x-labels">
+                            <span>5s</span>
+                            <span>7s</span>
+                            <span>9s</span>
+                            <span>11s</span>
+                            <span>13s</span>
+                            <span>15s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="spike-channel">
+                    <div class="channel-label">CH2</div>
+                    <div class="spike-waveform">
+                        <div class="graph-container">
+                            <div class="x-axis"></div>
+                            <div class="y-axis"></div>
+                            <svg class="graph-line" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                <polyline fill="none" stroke="#40e0d0" stroke-width="0.5" 
+                                         points="0,60 10,40 20,80 30,35 40,75 50,30 60,85 70,45 80,70 90,25 100,65"
+                                         opacity="0.9"/>
+                            </svg>
+                        </div>
+                        <div class="x-labels">
+                            <span>5s</span>
+                            <span>7s</span>
+                            <span>9s</span>
+                            <span>11s</span>
+                            <span>13s</span>
+                            <span>15s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="spike-channel">
+                    <div class="channel-label">CH3</div>
+                    <div class="spike-waveform">
+                        <div class="graph-container" style="opacity: 0.3;">
+                            <div class="x-axis"></div>
+                            <div class="y-axis"></div>
+                            <svg class="graph-line" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                <polyline fill="none" stroke="#666" stroke-width="0.5" 
+                                         points="0,50 10,50 20,50 30,50 40,50 50,50 60,50 70,50 80,50 90,50 100,50"
+                                         opacity="0.5"/>
+                            </svg>
+                        </div>
+                        <div class="x-labels" style="opacity: 0.4;">
+                            <span>5s</span>
+                            <span>7s</span>
+                            <span>9s</span>
+                            <span>11s</span>
+                            <span>13s</span>
+                            <span>15s</span>
+                        </div>
+                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(224, 230, 237, 0.4); font-size: 0.9rem;">Channel Disabled</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="timeline">
+                <div class="timeline-track"></div>
+                <div class="timeline-cursor"></div>
+                <div class="timeline-labels">
+                    <span>5s</span>
+                    <span>7.5s</span>
+                    <span>10s</span>
+                    <span>12.5s</span>
+                    <span>15s</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDropdown() {
+            const dropdown = document.getElementById('channelDropdown');
+            const button = document.querySelector('.dropdown-button');
+            const arrow = document.querySelector('.dropdown-arrow');
+            
+            dropdown.classList.toggle('hidden');
+            button.classList.toggle('open');
+            arrow.classList.toggle('rotated');
+        }
+
+        function toggleChannel(element, channelId) {
+            const checkbox = element.querySelector('.channel-checkbox');
+            checkbox.classList.toggle('checked');
+            
+            updateChannelCount();
+            
+            element.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 100);
+            
+            console.log(`Channel ${channelId} ${checkbox.classList.contains('checked') ? 'enabled' : 'disabled'}`);
+        }
+
+        function updateChannelCount() {
+            const checkedChannels = document.querySelectorAll('.channel-checkbox.checked').length;
+            const dropdownButton = document.querySelector('.dropdown-button span');
+            dropdownButton.textContent = `Select Channels (${checkedChannels}/385)`;
+        }
+
+        document.addEventListener('click', function(event) {
+            const dropdown = document.querySelector('.channel-dropdown');
+            const dropdownMenu = document.getElementById('channelDropdown');
+            
+            if (!dropdown.contains(event.target)) {
+                dropdownMenu.classList.add('hidden');
+                document.querySelector('.dropdown-button').classList.remove('open');
+                document.querySelector('.dropdown-arrow').classList.remove('rotated');
+            }
+        });
+
+        function toggleFilter(element) {
+            const checkbox = element.querySelector('.filter-checkbox');
+            checkbox.classList.toggle('checked');
+            
+            element.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                element.style.transform = 'translateX(2px)';
+            }, 100);
+        }
+
+        function refreshData() {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.textContent = 'Refreshing...';
+            btn.style.opacity = '0.7';
+            
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.style.opacity = '1';
+            }, 1500);
+        }
+
+        function updateTimelineCursor() {
+            const cursor = document.querySelector('.timeline-cursor');
+            cursor.style.left = '0%';
+        }
+
+        setInterval(updateTimelineCursor, 100);
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'r' || e.key === 'R') {
+                refreshData();
+            }
+        });
+    </script>
+</body>
+</html>

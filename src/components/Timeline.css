@@ -1,0 +1,73 @@
+.timeline {
+  height: 60px;
+  background: rgba(10, 10, 30, 0.9);
+  border: 1px solid rgba(64, 224, 208, 0.2);
+  border-radius: 8px;
+  position: relative;
+  margin-top: auto;
+  overflow: hidden;
+}
+
+.timeline-track {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(90deg, 
+    rgba(64, 224, 208, 0.2) 0%, 
+    rgba(64, 224, 208, 0.6) 50%, 
+    rgba(64, 224, 208, 0.2) 100%);
+  transform: translateY(-10px);
+  cursor: pointer;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.timeline-track:hover {
+  background: linear-gradient(90deg, 
+    rgba(64, 224, 208, 0.3) 0%, 
+    rgba(64, 224, 208, 0.7) 50%, 
+    rgba(64, 224, 208, 0.3) 100%);
+}
+
+.timeline-cursor {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 4px;
+  background: #ff6b6b;
+  box-shadow: 0 0 10px rgba(255, 107, 107, 0.8);
+  animation: glow 1.5s ease-in-out infinite alternate;
+  cursor: grab;
+  user-select: none;
+  transition: box-shadow 0.2s ease;
+  border-radius: 2px;
+}
+
+.timeline-cursor:hover {
+  box-shadow: 0 0 15px rgba(255, 107, 107, 1);
+}
+
+.timeline-cursor.dragging {
+  cursor: grabbing;
+  box-shadow: 0 0 20px rgba(255, 107, 107, 1);
+  animation: none;
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 10px rgba(255, 107, 107, 0.8); }
+  to { box-shadow: 0 0 20px rgba(255, 107, 107, 1); }
+}
+
+.timeline-labels {
+  position: absolute;
+  bottom: 5px;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  justify-content: space-between;
+  color: rgba(224, 230, 237, 0.6);
+  font-size: 0.7rem;
+}
+

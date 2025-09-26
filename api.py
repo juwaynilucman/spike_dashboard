@@ -47,7 +47,7 @@ def get_real_data(channels):
         if channel_id >= data_array.shape[0] or channel_id < 0:
             continue
             
-        channel_data = data_array[channel_id, 0:100000]
+        channel_data = data_array[channel_id, 0:10000]
         
         data[channel_id] = {
             'data': channel_data.tolist(),

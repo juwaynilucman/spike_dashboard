@@ -39,16 +39,12 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
       };
     }
 
-    // Extract data points within the current window
-    // Data comes with startTime/endTime metadata from backend
     const dataStartTime = data.startTime || 0;
     const dataEndTime = data.endTime || data.data.length;
     
-    // Calculate which portion of the loaded data to display
     const windowStart = Math.floor(timeRange.start);
     const windowEnd = Math.floor(timeRange.end);
     
-    // Calculate offset into the data array
     const offsetStart = Math.max(0, windowStart - dataStartTime);
     const offsetEnd = Math.min(data.data.length, windowEnd - dataStartTime);
     
@@ -56,7 +52,6 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
     const spikeFlags = data.isSpike ? data.isSpike.slice(offsetStart, offsetEnd) : [];
     const timePoints = Array.from({ length: windowData.length }, (_, i) => windowStart + i);
 
-    // Create segments for different colored line parts with proper connections
     const plotData = [];
     let currentSegment = null;
     
@@ -65,16 +60,13 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
       const isSpike = spikeFlags[index] || false;
       const segmentColor = isSpike ? '#ff4444' : '#40e0d0';
       
-      // Start a new segment if needed
       if (!currentSegment) {
         currentSegment = { x: [timePoint], y: [value], color: segmentColor };
       }
-      // If color changes, close current segment and start new one
       else if (currentSegment.color !== segmentColor) {
         const lastX = currentSegment.x[currentSegment.x.length - 1];
         const lastY = currentSegment.y[currentSegment.y.length - 1];
         
-        // Save the completed segment with its original color
         plotData.push({
           x: [...currentSegment.x],
           y: [...currentSegment.y],
@@ -86,8 +78,6 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
           connectgaps: false
         });
         
-        // Add connecting line segment
-        // If transitioning from teal to red, use red; otherwise use the previous color
         const connectColor = (currentSegment.color === '#40e0d0' && segmentColor === '#ff4444') 
           ? '#ff4444' 
           : currentSegment.color;
@@ -103,21 +93,18 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
           connectgaps: false
         });
         
-        // Start new segment with just the current point
         currentSegment = { 
           x: [timePoint], 
           y: [value], 
           color: segmentColor 
         };
       }
-      // Same color, just add the point
       else {
         currentSegment.x.push(timePoint);
         currentSegment.y.push(value);
       }
     });
     
-    // Add the last segment
     if (currentSegment && currentSegment.x.length > 0) {
       plotData.push({
         x: currentSegment.x,

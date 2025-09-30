@@ -7,12 +7,10 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-# Global variables for data
 data_array = None
 nrows = 385
 
 def load_binary_data():
-    """Load the binary data file"""
     global data_array
     
     inputfilename = 'subset_5pct.bin'
@@ -21,10 +19,7 @@ def load_binary_data():
         return None
     
     try:
-        # Create a memory-mapped array for the binary file
         data_memmap = np.memmap(inputfilename, dtype=np.int16, mode='r')
-        
-        # Reshape the memory-mapped array
         data_array = data_memmap.reshape((-1, nrows)).T
         
         print(f"Loaded data with shape: {data_array.shape}")
@@ -34,16 +29,11 @@ def load_binary_data():
         return None
 
 def get_real_data(channels, spike_threshold=None, start_time=0, end_time=20000):
-    """Extract real data from the binary file with spike detection
-    
-    Note: channels are 1-indexed from frontend, converted to 0-indexed here
-    """
     global data_array
     
     if data_array is None:
         return None
     
-    # Clamp to available data
     total_available = data_array.shape[1]
     start_time = max(0, int(start_time))
     end_time = min(total_available, int(end_time))
@@ -51,7 +41,6 @@ def get_real_data(channels, spike_threshold=None, start_time=0, end_time=20000):
     data = {}
     
     for channel_id in channels:
-        # Convert 1-indexed to 0-indexed for array access
         array_index = channel_id - 1
         
         if array_index >= data_array.shape[0] or array_index < 0:
@@ -59,11 +48,9 @@ def get_real_data(channels, spike_threshold=None, start_time=0, end_time=20000):
             
         channel_data = data_array[array_index, start_time:end_time]
         
-        # Detect spikes based on threshold (if provided)
         if spike_threshold is not None:
             is_spike = channel_data <= spike_threshold
         else:
-            # No threshold: all data is normal (no spikes)
             is_spike = [False] * len(channel_data)
         
         print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time})")
@@ -80,7 +67,6 @@ def get_real_data(channels, spike_threshold=None, start_time=0, end_time=20000):
 
 @app.route('/api/dataset-info', methods=['GET'])
 def get_dataset_info():
-    """Get dataset metadata (total points, channels, etc.)"""
     try:
         global data_array
         
@@ -99,7 +85,6 @@ def get_dataset_info():
 
 @app.route('/api/spike-data', methods=['POST'])
 def get_spike_data():
-    """Get spike data for selected channels and time range"""
     try:
         data = request.get_json()
         channels = data.get('channels', [])
@@ -107,7 +92,6 @@ def get_spike_data():
         start_time = data.get('startTime', 0)
         end_time = data.get('endTime', 20000)
         
-        # Limit to max 20k points per request
         max_points = 20000
         end_time = min(end_time, start_time + max_points)
 

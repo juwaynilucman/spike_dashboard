@@ -3,10 +3,8 @@ import SpikeChannel from './SpikeChannel';
 import './SpikeGrid.css';
 
 const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange, windowSize, spikeThreshold, onChannelScroll, isLoading }) => {
-  // Show channels starting from the scroll offset
   const displayChannels = selectedChannels.slice(channelScrollOffset, channelScrollOffset + 3);
   
-  // Fill remaining slots with empty channels if needed
   const gridChannels = Array.from({ length: 3 }, (_, index) => {
     const channelId = displayChannels[index];
     return {

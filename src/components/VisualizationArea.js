@@ -55,7 +55,7 @@ const VisualizationArea = ({
             onChange={(e) => {
               const inputValue = e.target.value;
               if (inputValue === '') {
-                onSpikeThresholdChange(null); // No threshold
+                onSpikeThresholdChange(null);
               } else {
                 const value = parseFloat(inputValue);
                 if (!isNaN(value)) {

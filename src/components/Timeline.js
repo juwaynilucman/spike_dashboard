@@ -6,7 +6,6 @@ const Timeline = ({ timeRange, windowSize, totalDataRange = 3500000, onTimeRange
   const timelineRef = useRef(null);
   const dragStartRef = useRef({ x: 0, timeRange: { start: 0, end: 0 } });
 
-  // Calculate window position and width as percentages
   const windowPosition = useMemo(() => {
     const startPercent = (timeRange.start / totalDataRange) * 100;
     const widthPercent = (windowSize / totalDataRange) * 100;
@@ -26,7 +25,6 @@ const Timeline = ({ timeRange, windowSize, totalDataRange = 3500000, onTimeRange
   };
 
   const handleTrackClick = (e) => {
-    // Only handle clicks directly on track, not on window
     if (e.target.classList.contains('timeline-window')) return;
     
     if (timelineRef.current) {
@@ -35,7 +33,6 @@ const Timeline = ({ timeRange, windowSize, totalDataRange = 3500000, onTimeRange
       const clickPercent = (x / rect.width) * 100;
       const clickTime = (clickPercent / 100) * totalDataRange;
       
-      // Center the window on the clicked position
       const newStart = Math.max(0, Math.min(totalDataRange - windowSize, clickTime - windowSize / 2));
       const newEnd = newStart + windowSize;
       
@@ -43,7 +40,6 @@ const Timeline = ({ timeRange, windowSize, totalDataRange = 3500000, onTimeRange
     }
   };
 
-  // Handle dragging
   React.useEffect(() => {
     if (isDragging) {
       const handleGlobalMouseMove = (e) => {
@@ -53,10 +49,8 @@ const Timeline = ({ timeRange, windowSize, totalDataRange = 3500000, onTimeRange
         const x = e.clientX - rect.left;
         const deltaX = x - dragStartRef.current.x;
         
-        // Calculate how much to shift the time range
         const timeShift = (deltaX / rect.width) * totalDataRange;
         
-        // Calculate new time range
         const newStart = Math.max(0, Math.min(totalDataRange - windowSize, 
           dragStartRef.current.timeRange.start + timeShift));
         const newEnd = newStart + windowSize;

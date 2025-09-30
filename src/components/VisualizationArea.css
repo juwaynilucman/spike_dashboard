@@ -83,3 +83,23 @@
   border-color: #40e0d0;
   box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
 }
+
+.invert-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: rgba(224, 230, 237, 0.7);
+  font-size: 0.9rem;
+}
+
+.invert-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #40e0d0;
+}
+
+.invert-checkbox span {
+  user-select: none;
+}

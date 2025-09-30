@@ -12,6 +12,7 @@ function App() {
   const [timeRange, setTimeRange] = useState({ start: 0, end: 1000 });
   const [windowSize, setWindowSize] = useState(1000);
   const [spikeThreshold, setSpikeThreshold] = useState(-25);
+  const [invertData, setInvertData] = useState(false);
   const [datasetInfo, setDatasetInfo] = useState({ totalDataPoints: 3500000, totalChannels: 385 });
   
   const dataCache = React.useRef({});
@@ -25,7 +26,7 @@ function App() {
       dataCache.current = {};
       fetchSpikeData();
     }
-  }, [selectedChannels, spikeThreshold]);
+  }, [selectedChannels, spikeThreshold, invertData]);
 
   const fetchTimeoutRef = React.useRef(null);
 
@@ -67,7 +68,7 @@ function App() {
     const fetchStart = Math.max(0, Math.floor(timeRange.start) - buffer);
     const fetchEnd = Math.min(datasetInfo.totalDataPoints, Math.ceil(timeRange.end) + buffer);
     
-    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}`;
+    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}-${invertData}`;
     const needsFetch = selectedChannels.some(ch => !dataCache.current[`${ch}-${cacheKey}`]);
     
     if (!needsFetch) {
@@ -90,6 +91,7 @@ function App() {
         body: JSON.stringify({
           channels: selectedChannels,
           spikeThreshold: spikeThreshold,
+          invertData: invertData,
           startTime: fetchStart,
           endTime: fetchEnd
         })
@@ -154,11 +156,13 @@ function App() {
                 timeRange={timeRange}
                 windowSize={windowSize}
                 spikeThreshold={spikeThreshold}
+                invertData={invertData}
                 totalDataPoints={datasetInfo.totalDataPoints}
                 onTimeRangeChange={setTimeRange}
                 onWindowSizeChange={handleWindowSizeChange}
                 onChannelScroll={handleChannelScroll}
                 onSpikeThresholdChange={setSpikeThreshold}
+                onInvertDataChange={setInvertData}
                 isLoading={isLoading}
               />
       </div>

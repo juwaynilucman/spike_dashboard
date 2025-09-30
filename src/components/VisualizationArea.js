@@ -10,11 +10,13 @@ const VisualizationArea = ({
   timeRange, 
   windowSize,
   spikeThreshold,
+  invertData,
   totalDataPoints,
   onTimeRangeChange,
   onWindowSizeChange,
   onChannelScroll,
   onSpikeThresholdChange,
+  onInvertDataChange,
   isLoading 
 }) => {
   return (
@@ -81,6 +83,14 @@ const VisualizationArea = ({
             }}
             step="1"
           />
+          <label className="invert-checkbox">
+            <input 
+              type="checkbox" 
+              checked={invertData}
+              onChange={(e) => onInvertDataChange(e.target.checked)}
+            />
+            <span>Invert Data</span>
+          </label>
         </div>
       </div>
 

@@ -28,7 +28,7 @@ def load_binary_data():
         print(f"Error loading binary data: {e}")
         return None
 
-def get_real_data(channels, spike_threshold=None, start_time=0, end_time=20000):
+def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=0, end_time=20000):
     global data_array
     
     if data_array is None:
@@ -48,12 +48,15 @@ def get_real_data(channels, spike_threshold=None, start_time=0, end_time=20000):
             
         channel_data = data_array[array_index, start_time:end_time]
         
+        if invert_data:
+            channel_data = -channel_data
+        
         if spike_threshold is not None:
             is_spike = channel_data <= spike_threshold
         else:
             is_spike = [False] * len(channel_data)
         
-        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time})")
+        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time}, inverted: {invert_data})")
         
         data[channel_id] = {
             'data': channel_data.tolist(),
@@ -89,13 +92,14 @@ def get_spike_data():
         data = request.get_json()
         channels = data.get('channels', [])
         spike_threshold = data.get('spikeThreshold', None)
+        invert_data = data.get('invertData', False)
         start_time = data.get('startTime', 0)
         end_time = data.get('endTime', 20000)
         
         max_points = 20000
         end_time = min(end_time, start_time + max_points)
 
-        spike_data = get_real_data(channels, spike_threshold, start_time, end_time)
+        spike_data = get_real_data(channels, spike_threshold, invert_data, start_time, end_time)
         
         return jsonify(spike_data)
         

@@ -2,7 +2,7 @@ import React from 'react';
 import SpikeChannel from './SpikeChannel';
 import './SpikeGrid.css';
 
-const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange, windowSize, onChannelScroll, isLoading }) => {
+const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange, windowSize, spikeThreshold, onChannelScroll, isLoading }) => {
   // Show channels starting from the scroll offset
   const displayChannels = selectedChannels.slice(channelScrollOffset, channelScrollOffset + 3);
   
@@ -31,6 +31,7 @@ const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange
             isActive={channel.isActive}
             timeRange={timeRange}
             windowSize={windowSize}
+            spikeThreshold={spikeThreshold}
             isLoading={isLoading}
           />
         ))}

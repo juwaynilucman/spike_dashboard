@@ -33,8 +33,8 @@ def load_binary_data():
         print(f"Error loading binary data: {e}")
         return None
 
-def get_real_data(channels):
-    """Extract real data from the binary file"""
+def get_real_data(channels, spike_threshold=None):
+    """Extract real data from the binary file with spike detection"""
     global data_array
     
     if data_array is None:
@@ -49,8 +49,16 @@ def get_real_data(channels):
             
         channel_data = data_array[channel_id, 0:10000]
         
+        # Detect spikes based on threshold (if provided)
+        if spike_threshold is not None:
+            is_spike = channel_data <= spike_threshold
+        else:
+            # No threshold: all data is normal (no spikes)
+            is_spike = [False] * len(channel_data)
+        
         data[channel_id] = {
             'data': channel_data.tolist(),
+            'isSpike': is_spike if isinstance(is_spike, list) else is_spike.tolist(),
             'channelId': channel_id
         }
     
@@ -62,8 +70,9 @@ def get_spike_data():
     try:
         data = request.get_json()
         channels = data.get('channels', [])
+        spike_threshold = data.get('spikeThreshold', None)
 
-        spike_data = get_real_data(channels)
+        spike_data = get_real_data(channels, spike_threshold)
         
         return jsonify(spike_data)
         

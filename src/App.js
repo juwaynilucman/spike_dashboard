@@ -11,13 +11,14 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [timeRange, setTimeRange] = useState({ start: 0.0, end: 1000.0 });
   const [windowSize] = useState(1000); // Fixed window size of 1000 data points
+  const [spikeThreshold, setSpikeThreshold] = useState(null); // Default: no threshold (null = disabled)
 
-  // Fetch spike data when selected channels change
+  // Fetch spike data when selected channels or threshold change
   useEffect(() => {
     if (selectedChannels.length > 0) {
       fetchSpikeData();
     }
-  }, [selectedChannels]);
+  }, [selectedChannels, spikeThreshold]);
 
   const fetchSpikeData = async () => {
     setIsLoading(true);
@@ -28,7 +29,8 @@ function App() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          channels: selectedChannels
+          channels: selectedChannels,
+          spikeThreshold: spikeThreshold
         })
       });
       
@@ -78,8 +80,10 @@ function App() {
           channelScrollOffset={channelScrollOffset}
           timeRange={timeRange}
           windowSize={windowSize}
+          spikeThreshold={spikeThreshold}
           onTimeRangeChange={setTimeRange}
           onChannelScroll={handleChannelScroll}
+          onSpikeThresholdChange={setSpikeThreshold}
           isLoading={isLoading}
         />
       </div>

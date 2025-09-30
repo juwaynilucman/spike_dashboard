@@ -9,8 +9,10 @@ const VisualizationArea = ({
   channelScrollOffset,
   timeRange, 
   windowSize,
+  spikeThreshold,
   onTimeRangeChange, 
   onChannelScroll,
+  onSpikeThresholdChange,
   isLoading 
 }) => {
   return (
@@ -43,6 +45,24 @@ const VisualizationArea = ({
               }
             }}
             placeholder="End"
+          />
+          <label>Spike Threshold:</label>
+          <input 
+            type="number" 
+            className="threshold-input" 
+            value={spikeThreshold ?? ''}
+            onChange={(e) => {
+              const inputValue = e.target.value;
+              if (inputValue === '') {
+                onSpikeThresholdChange(null); // No threshold
+              } else {
+                const value = parseFloat(inputValue);
+                if (!isNaN(value)) {
+                  onSpikeThresholdChange(value);
+                }
+              }
+            }}
+            step="1"
           />
         </div>
       </div>

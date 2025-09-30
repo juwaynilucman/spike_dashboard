@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import './SpikeChannel.css';
 
-const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, isLoading }) => {
+const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeThreshold, isLoading }) => {
   const generatePlotData = () => {
     if (!data || !data.data || !isActive) {
       return {
@@ -43,17 +43,86 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, isLoad
     const startIndex = Math.floor(timeRange.start);
     const endIndex = Math.min(Math.floor(timeRange.end), data.data.length);
     const windowData = data.data.slice(startIndex, endIndex);
+    const spikeFlags = data.isSpike ? data.isSpike.slice(startIndex, endIndex) : [];
     const timePoints = Array.from({ length: windowData.length }, (_, i) => startIndex + i);
 
-    return {
-      data: [{
-        x: timePoints,
-        y: windowData,
+    // Create segments for different colored line parts with proper connections
+    const plotData = [];
+    let currentSegment = null;
+    
+    windowData.forEach((value, index) => {
+      const timePoint = timePoints[index];
+      const isSpike = spikeFlags[index] || false;
+      const segmentColor = isSpike ? '#ff4444' : '#40e0d0';
+      
+      // Start a new segment if needed
+      if (!currentSegment) {
+        currentSegment = { x: [timePoint], y: [value], color: segmentColor };
+      }
+      // If color changes, close current segment and start new one
+      else if (currentSegment.color !== segmentColor) {
+        const lastX = currentSegment.x[currentSegment.x.length - 1];
+        const lastY = currentSegment.y[currentSegment.y.length - 1];
+        
+        // Save the completed segment with its original color
+        plotData.push({
+          x: [...currentSegment.x],
+          y: [...currentSegment.y],
+          type: 'scatter',
+          mode: 'lines',
+          line: { color: currentSegment.color, width: 1 },
+          showlegend: false,
+          hoverinfo: 'x+y',
+          connectgaps: false
+        });
+        
+        // Add connecting line segment
+        // If transitioning from teal to red, use red; otherwise use the previous color
+        const connectColor = (currentSegment.color === '#40e0d0' && segmentColor === '#ff4444') 
+          ? '#ff4444' 
+          : currentSegment.color;
+        
+        plotData.push({
+          x: [lastX, timePoint],
+          y: [lastY, value],
+          type: 'scatter',
+          mode: 'lines',
+          line: { color: connectColor, width: 1 },
+          showlegend: false,
+          hoverinfo: 'x+y',
+          connectgaps: false
+        });
+        
+        // Start new segment with just the current point
+        currentSegment = { 
+          x: [timePoint], 
+          y: [value], 
+          color: segmentColor 
+        };
+      }
+      // Same color, just add the point
+      else {
+        currentSegment.x.push(timePoint);
+        currentSegment.y.push(value);
+      }
+    });
+    
+    // Add the last segment
+    if (currentSegment && currentSegment.x.length > 0) {
+      plotData.push({
+        x: currentSegment.x,
+        y: currentSegment.y,
         type: 'scatter',
         mode: 'lines',
-        line: { color: '#40e0d0', width: 1 },
-        name: 'Spike Data'
-      }],
+        line: { color: currentSegment.color, width: 1 },
+        showlegend: false,
+        hoverinfo: 'x+y',
+        connectgaps: false
+      });
+    }
+
+    return {
+      data: plotData,
       layout: {
         xaxis: { 
           title: 'Time (s)',
@@ -72,6 +141,7 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, isLoad
         paper_bgcolor: 'transparent',
         font: { color: '#e0e6ed' },
         margin: { l: 50, r: 20, t: 20, b: 50 },
+        showlegend: false
       },
       config: {
         displayModeBar: false,

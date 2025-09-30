@@ -42,16 +42,19 @@ const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange
           <div 
             className="channel-slider-thumb"
             style={{ 
-              top: `${maxOffset > 0 ? (channelScrollOffset / maxOffset) * 100 : 0}%`,
+              top: `calc(${maxOffset > 0 ? (channelScrollOffset / maxOffset) * 100 : 0}% * (100% - 60px) / 100%)`,
               opacity: selectedChannels.length > 3 ? 1 : 0.3
             }}
             onMouseDown={(e) => {
               e.preventDefault();
               if (selectedChannels.length <= 3) return;
               const rect = e.currentTarget.parentElement.getBoundingClientRect();
+              const thumbHeight = 60; // Must match the height in CSS
               const handleMouseMove = (moveEvent) => {
                 const y = moveEvent.clientY - rect.top;
-                const percentage = Math.max(0, Math.min(100, (y / rect.height) * 100));
+                const maxY = rect.height - thumbHeight;
+                const clampedY = Math.max(0, Math.min(maxY, y));
+                const percentage = maxY > 0 ? (clampedY / maxY) * 100 : 0;
                 const newOffset = Math.round((percentage / 100) * maxOffset);
                 onChannelScroll(newOffset);
               };

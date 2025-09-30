@@ -11,7 +11,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [timeRange, setTimeRange] = useState({ start: 0.0, end: 1000.0 });
   const [windowSize] = useState(1000); // Fixed window size of 1000 data points
-  const [spikeThreshold, setSpikeThreshold] = useState(null); // Default: no threshold (null = disabled)
+  const [spikeThreshold, setSpikeThreshold] = useState(-25); // Default threshold: -25
 
   // Fetch spike data when selected channels or threshold change
   useEffect(() => {
@@ -23,7 +23,8 @@ function App() {
   const fetchSpikeData = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/spike-data', {
+      const apiUrl = process.env.REACT_APP_API_URL;
+      const response = await fetch(`${apiUrl}/api/spike-data`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

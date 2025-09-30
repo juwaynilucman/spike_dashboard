@@ -34,7 +34,10 @@ def load_binary_data():
         return None
 
 def get_real_data(channels, spike_threshold=None):
-    """Extract real data from the binary file with spike detection"""
+    """Extract real data from the binary file with spike detection
+    
+    Note: channels are 1-indexed from frontend, converted to 0-indexed here
+    """
     global data_array
     
     if data_array is None:
@@ -43,11 +46,13 @@ def get_real_data(channels, spike_threshold=None):
     data = {}
     
     for channel_id in channels:
+        # Convert 1-indexed to 0-indexed for array access
+        array_index = channel_id - 1
         
-        if channel_id >= data_array.shape[0] or channel_id < 0:
+        if array_index >= data_array.shape[0] or array_index < 0:
             continue
             
-        channel_data = data_array[channel_id, 0:10000]
+        channel_data = data_array[array_index, 0:10000]
         
         # Detect spikes based on threshold (if provided)
         if spike_threshold is not None:

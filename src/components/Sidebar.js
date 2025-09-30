@@ -1,23 +1,25 @@
 import React, { useState } from 'react';
-import ChannelSelector from './ChannelSelector';
+import ChannelGrid from './ChannelGrid';
+import DataTypeSelector from './DataTypeSelector';
 import './Sidebar.css';
 
 const Sidebar = ({ selectedChannels, onChannelToggle }) => {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
-  const toggleDropdown = () => {
-    setIsDropdownOpen(!isDropdownOpen);
-  };
+  const [selectedDataType, setSelectedDataType] = useState('raw');
 
   return (
     <div className="sidebar">
       <div className="control-group">
-        <h3>Channel Selection</h3>
-        <ChannelSelector
+        <h3>Channel Selection ({selectedChannels.length}/385)</h3>
+        <ChannelGrid
           selectedChannels={selectedChannels}
           onChannelToggle={onChannelToggle}
-          isOpen={isDropdownOpen}
-          onToggle={toggleDropdown}
+          totalChannels={385}
+        />
+      </div>
+      <div className="data-type-group">
+        <DataTypeSelector
+          selectedDataType={selectedDataType}
+          onDataTypeChange={setSelectedDataType}
         />
       </div>
     </div>

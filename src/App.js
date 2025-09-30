@@ -5,7 +5,7 @@ import VisualizationArea from './components/VisualizationArea';
 import './App.css';
 
 function App() {
-  const [selectedChannels, setSelectedChannels] = useState([0, 1, 2]); // Default to first 3 channels
+  const [selectedChannels, setSelectedChannels] = useState([1, 2, 3]); // Default to first 3 channels (1-indexed)
   const [channelScrollOffset, setChannelScrollOffset] = useState(0); // Scroll offset for channels
   const [spikeData, setSpikeData] = useState({});
   const [isLoading, setIsLoading] = useState(false);

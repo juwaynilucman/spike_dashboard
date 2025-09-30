@@ -155,7 +155,7 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
   return (
     <div className={`spike-channel ${!isActive ? 'inactive' : ''}`}>
       <div className="channel-label">
-        {channelId !== undefined ? `CH${channelId + 1}` : 'No Channel'}
+        {channelId !== undefined ? `CH${channelId}` : 'No Channel'}
       </div>
       <div className="spike-waveform">
         {isActive ? (

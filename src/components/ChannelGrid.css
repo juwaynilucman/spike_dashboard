@@ -1,0 +1,80 @@
+.channel-grid-wrapper {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.channel-grid-scroll {
+  width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-bottom: 20px;
+}
+
+.channel-grid-canvas {
+  position: relative;
+  width: 150px; /* Enough to fit x coordinates 0-72 + box width (30px) */
+  height: 9700px; /* Enough to fit all channels: 96 groups * 100px + margins */
+  padding: 20px 25px; /* Center the boxes horizontally with padding */
+}
+
+.channel-box {
+  position: absolute;
+  width: 30px; /* Larger box width for better visibility */
+  height: 30px; /* Larger box height for better visibility */
+  background: rgba(100, 100, 120, 0.6);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #e0e6ed;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  border-radius: 3px;
+}
+
+.channel-box:hover {
+  background: rgba(64, 224, 208, 0.3);
+  border-color: #40e0d0;
+  transform: scale(1.1);
+  z-index: 10;
+}
+
+.channel-box.selected {
+  background: linear-gradient(135deg, #40e0d0, #00bcd4);
+  border-color: #40e0d0;
+  color: #0f0f23;
+  font-weight: 600;
+  box-shadow: 0 0 8px rgba(64, 224, 208, 0.6);
+}
+
+.channel-box.selected:hover {
+  background: linear-gradient(135deg, #50f0e0, #10cce4);
+}
+
+/* Custom scrollbar */
+.channel-grid-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.channel-grid-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.channel-grid-scroll::-webkit-scrollbar-thumb {
+  background: rgba(64, 224, 208, 0.3);
+  border-radius: 4px;
+}
+
+.channel-grid-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(64, 224, 208, 0.5);
+}

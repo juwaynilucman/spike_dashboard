@@ -1,3 +1,6 @@
+# Build files
+build/
+
 # Node modules
 node_modules/
 

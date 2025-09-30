@@ -10,6 +10,7 @@ const VisualizationArea = ({
   timeRange, 
   windowSize,
   spikeThreshold,
+  totalDataPoints,
   onTimeRangeChange, 
   onChannelScroll,
   onSpikeThresholdChange,
@@ -80,6 +81,7 @@ const VisualizationArea = ({
       <Timeline 
         timeRange={timeRange}
         windowSize={windowSize}
+        totalDataRange={totalDataPoints}
         onTimeRangeChange={onTimeRangeChange}
       />
     </div>

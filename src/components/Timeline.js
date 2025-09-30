@@ -1,22 +1,23 @@
 import React, { useState, useRef, useMemo } from 'react';
 import './Timeline.css';
 
-const Timeline = ({ timeRange, windowSize, onTimeRangeChange }) => {
+const Timeline = ({ timeRange, windowSize, totalDataRange = 3500000, onTimeRangeChange }) => {
   const [isDragging, setIsDragging] = useState(false);
   const timelineRef = useRef(null);
   const dragStartRef = useRef({ x: 0, timeRange: { start: 0, end: 0 } });
 
-  // Calculate cursor position based on current window center
-  const cursorPosition = useMemo(() => {
-    const totalDataRange = 1000;
-    const centerTime = (timeRange.start + timeRange.end) / 2;
-    return Math.max(0, Math.min(100, (centerTime / totalDataRange) * 100));
-  }, [timeRange]);
+  // Calculate window position and width as percentages
+  const windowPosition = useMemo(() => {
+    const startPercent = (timeRange.start / totalDataRange) * 100;
+    const widthPercent = (windowSize / totalDataRange) * 100;
+    return { left: startPercent, width: widthPercent };
+  }, [timeRange, windowSize, totalDataRange]);
 
-  const handleMouseDown = (e) => {
+  const handleWindowMouseDown = (e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
+    
     if (timelineRef.current) {
       const rect = timelineRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
@@ -24,30 +25,25 @@ const Timeline = ({ timeRange, windowSize, onTimeRangeChange }) => {
     }
   };
 
-  const handleTimelineClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragging && timelineRef.current) {
+  const handleTrackClick = (e) => {
+    // Only handle clicks directly on track, not on window
+    if (e.target.classList.contains('timeline-window')) return;
+    
+    if (timelineRef.current) {
       const rect = timelineRef.current.getBoundingClientRect();
       const x = e.clientX - rect.left;
-      const positionPercent = Math.max(0, Math.min(100, (x / rect.width) * 100));
+      const clickPercent = (x / rect.width) * 100;
+      const clickTime = (clickPercent / 100) * totalDataRange;
       
-      // Calculate new center time
-      const totalDataRange = 1000;
-      const newCenterTime = (positionPercent / 100) * totalDataRange;
-      
-      const newStart = Math.max(0, Math.min(totalDataRange - windowSize, newCenterTime - windowSize / 2));
+      // Center the window on the clicked position
+      const newStart = Math.max(0, Math.min(totalDataRange - windowSize, clickTime - windowSize / 2));
       const newEnd = newStart + windowSize;
       
       onTimeRangeChange({ start: newStart, end: newEnd });
     }
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  // Add global mouse events when dragging
+  // Handle dragging
   React.useEffect(() => {
     if (isDragging) {
       const handleGlobalMouseMove = (e) => {
@@ -58,14 +54,13 @@ const Timeline = ({ timeRange, windowSize, onTimeRangeChange }) => {
         const deltaX = x - dragStartRef.current.x;
         
         // Calculate how much to shift the time range
-        const totalDataRange = 1000;
         const timeShift = (deltaX / rect.width) * totalDataRange;
         
         // Calculate new time range
-        const newStart = Math.max(0, Math.min(totalDataRange - windowSize, dragStartRef.current.timeRange.start + timeShift));
+        const newStart = Math.max(0, Math.min(totalDataRange - windowSize, 
+          dragStartRef.current.timeRange.start + timeShift));
         const newEnd = newStart + windowSize;
         
-        // Update the time range
         onTimeRangeChange({ start: newStart, end: newEnd });
       };
       
@@ -73,7 +68,7 @@ const Timeline = ({ timeRange, windowSize, onTimeRangeChange }) => {
         setIsDragging(false);
       };
       
-      document.addEventListener('mousemove', handleGlobalMouseMove, { passive: false });
+      document.addEventListener('mousemove', handleGlobalMouseMove);
       document.addEventListener('mouseup', handleGlobalMouseUp);
       
       return () => {
@@ -81,36 +76,42 @@ const Timeline = ({ timeRange, windowSize, onTimeRangeChange }) => {
         document.removeEventListener('mouseup', handleGlobalMouseUp);
       };
     }
-  }, [isDragging, windowSize, onTimeRangeChange]);
+  }, [isDragging, windowSize, onTimeRangeChange, totalDataRange]);
 
   const timeLabels = useMemo(() => {
     const labels = [];
-    const totalDataRange = 1000;
-    const step = totalDataRange / 4;
+    const numLabels = 5;
     
-    for (let i = 0; i <= 4; i++) {
-      labels.push((i * step).toFixed(0));
+    for (let i = 0; i < numLabels; i++) {
+      const time = (i / (numLabels - 1)) * totalDataRange;
+      labels.push(`${Math.round(time)}s`);
     }
     
     return labels;
-  }, []);
+  }, [totalDataRange]);
 
   return (
     <div className="timeline">
       <div 
         className="timeline-track" 
         ref={timelineRef}
-        onClick={handleTimelineClick}
-        onMouseDown={handleMouseDown}
+        onClick={handleTrackClick}
       >
         <div 
-          className={`timeline-cursor ${isDragging ? 'dragging' : ''}`}
-          style={{ left: `${cursorPosition}%` }}
-        ></div>
+          className={`timeline-window ${isDragging ? 'dragging' : ''}`}
+          style={{ 
+            left: `${windowPosition.left}%`, 
+            width: `${windowPosition.width}%` 
+          }}
+          onMouseDown={handleWindowMouseDown}
+        >
+          <div className="timeline-window-edge left"></div>
+          <div className="timeline-window-edge right"></div>
+        </div>
       </div>
       <div className="timeline-labels">
         {timeLabels.map((label, index) => (
-          <span key={index}>{label}s</span>
+          <span key={index}>{label}</span>
         ))}
       </div>
     </div>

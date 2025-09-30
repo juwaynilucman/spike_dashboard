@@ -6,68 +6,76 @@
   position: relative;
   margin-top: auto;
   overflow: hidden;
+  padding: 0 1rem;
 }
 
 .timeline-track {
   position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 20px;
-  background: linear-gradient(90deg, 
-    rgba(64, 224, 208, 0.2) 0%, 
-    rgba(64, 224, 208, 0.6) 50%, 
-    rgba(64, 224, 208, 0.2) 100%);
-  transform: translateY(-10px);
+  top: 15px;
+  left: 1rem;
+  right: 1rem;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.05);
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: 6px;
   transition: background 0.2s ease;
 }
 
 .timeline-track:hover {
-  background: linear-gradient(90deg, 
-    rgba(64, 224, 208, 0.3) 0%, 
-    rgba(64, 224, 208, 0.7) 50%, 
-    rgba(64, 224, 208, 0.3) 100%);
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.timeline-cursor {
+.timeline-window {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
-  width: 4px;
-  background: #ff6b6b;
-  box-shadow: 0 0 10px rgba(255, 107, 107, 0.8);
-  animation: glow 1.5s ease-in-out infinite alternate;
+  top: 0;
+  height: 100%;
+  background: rgba(64, 224, 208, 0.3);
+  border: 2px solid rgba(64, 224, 208, 0.6);
+  border-radius: 6px;
   cursor: grab;
+  transition: all 0.2s ease;
   user-select: none;
-  transition: box-shadow 0.2s ease;
-  border-radius: 2px;
 }
 
-.timeline-cursor:hover {
-  box-shadow: 0 0 15px rgba(255, 107, 107, 1);
+.timeline-window:hover {
+  background: rgba(64, 224, 208, 0.4);
+  border-color: rgba(64, 224, 208, 0.8);
 }
 
-.timeline-cursor.dragging {
+.timeline-window.dragging {
   cursor: grabbing;
-  box-shadow: 0 0 20px rgba(255, 107, 107, 1);
-  animation: none;
+  background: rgba(64, 224, 208, 0.5);
+  border-color: #40e0d0;
+  box-shadow: 0 0 15px rgba(64, 224, 208, 0.5);
 }
 
-@keyframes glow {
-  from { box-shadow: 0 0 10px rgba(255, 107, 107, 0.8); }
-  to { box-shadow: 0 0 20px rgba(255, 107, 107, 1); }
+.timeline-window-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: rgba(64, 224, 208, 0.8);
+}
+
+.timeline-window-edge.left {
+  left: 0;
+  border-radius: 4px 0 0 4px;
+}
+
+.timeline-window-edge.right {
+  right: 0;
+  border-radius: 0 4px 4px 0;
 }
 
 .timeline-labels {
   position: absolute;
-  bottom: 5px;
+  bottom: 8px;
   left: 1rem;
   right: 1rem;
   display: flex;
   justify-content: space-between;
   color: rgba(224, 230, 237, 0.6);
   font-size: 0.7rem;
+  pointer-events: none;
 }
 

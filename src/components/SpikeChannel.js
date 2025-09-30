@@ -40,11 +40,21 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
     }
 
     // Extract data points within the current window
-    const startIndex = Math.floor(timeRange.start);
-    const endIndex = Math.min(Math.floor(timeRange.end), data.data.length);
-    const windowData = data.data.slice(startIndex, endIndex);
-    const spikeFlags = data.isSpike ? data.isSpike.slice(startIndex, endIndex) : [];
-    const timePoints = Array.from({ length: windowData.length }, (_, i) => startIndex + i);
+    // Data comes with startTime/endTime metadata from backend
+    const dataStartTime = data.startTime || 0;
+    const dataEndTime = data.endTime || data.data.length;
+    
+    // Calculate which portion of the loaded data to display
+    const windowStart = Math.floor(timeRange.start);
+    const windowEnd = Math.floor(timeRange.end);
+    
+    // Calculate offset into the data array
+    const offsetStart = Math.max(0, windowStart - dataStartTime);
+    const offsetEnd = Math.min(data.data.length, windowEnd - dataStartTime);
+    
+    const windowData = data.data.slice(offsetStart, offsetEnd);
+    const spikeFlags = data.isSpike ? data.isSpike.slice(offsetStart, offsetEnd) : [];
+    const timePoints = Array.from({ length: windowData.length }, (_, i) => windowStart + i);
 
     // Create segments for different colored line parts with proper connections
     const plotData = [];

@@ -33,7 +33,7 @@ def load_binary_data():
         print(f"Error loading binary data: {e}")
         return None
 
-def get_real_data(channels, spike_threshold=None):
+def get_real_data(channels, spike_threshold=None, start_time=0, end_time=20000):
     """Extract real data from the binary file with spike detection
     
     Note: channels are 1-indexed from frontend, converted to 0-indexed here
@@ -42,6 +42,11 @@ def get_real_data(channels, spike_threshold=None):
     
     if data_array is None:
         return None
+    
+    # Clamp to available data
+    total_available = data_array.shape[1]
+    start_time = max(0, int(start_time))
+    end_time = min(total_available, int(end_time))
     
     data = {}
     
@@ -52,7 +57,7 @@ def get_real_data(channels, spike_threshold=None):
         if array_index >= data_array.shape[0] or array_index < 0:
             continue
             
-        channel_data = data_array[array_index, 0:10000]
+        channel_data = data_array[array_index, start_time:end_time]
         
         # Detect spikes based on threshold (if provided)
         if spike_threshold is not None:
@@ -61,13 +66,36 @@ def get_real_data(channels, spike_threshold=None):
             # No threshold: all data is normal (no spikes)
             is_spike = [False] * len(channel_data)
         
+        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time})")
+        
         data[channel_id] = {
             'data': channel_data.tolist(),
             'isSpike': is_spike if isinstance(is_spike, list) else is_spike.tolist(),
-            'channelId': channel_id
+            'channelId': channel_id,
+            'startTime': start_time,
+            'endTime': end_time
         }
     
     return data
+
+@app.route('/api/dataset-info', methods=['GET'])
+def get_dataset_info():
+    """Get dataset metadata (total points, channels, etc.)"""
+    try:
+        global data_array
+        
+        if data_array is None:
+            return jsonify({'error': 'Data not loaded'}), 500
+        
+        return jsonify({
+            'totalChannels': data_array.shape[0],
+            'totalDataPoints': int(data_array.shape[1]),
+            'maxTimeRange': int(data_array.shape[1])
+        })
+        
+    except Exception as e:
+        print(f"Error in get_dataset_info: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/spike-data', methods=['POST'])
 def get_spike_data():
@@ -76,8 +104,14 @@ def get_spike_data():
         data = request.get_json()
         channels = data.get('channels', [])
         spike_threshold = data.get('spikeThreshold', None)
+        start_time = data.get('startTime', 0)
+        end_time = data.get('endTime', 20000)
+        
+        # Limit to max 20k points per request
+        max_points = 20000
+        end_time = min(end_time, start_time + max_points)
 
-        spike_data = get_real_data(channels, spike_threshold)
+        spike_data = get_real_data(channels, spike_threshold, start_time, end_time)
         
         return jsonify(spike_data)
         

@@ -11,7 +11,8 @@ const VisualizationArea = ({
   windowSize,
   spikeThreshold,
   totalDataPoints,
-  onTimeRangeChange, 
+  onTimeRangeChange,
+  onWindowSizeChange,
   onChannelScroll,
   onSpikeThresholdChange,
   isLoading 
@@ -23,29 +24,44 @@ const VisualizationArea = ({
         <div className="time-controls">
           <label>Time Range:</label>
           <input 
-            type="text" 
+            type="number" 
             className="time-input" 
-            value={`${timeRange.start.toFixed(2)}s`}
+            value={Math.floor(timeRange.start)}
             onChange={(e) => {
-              const value = parseFloat(e.target.value);
+              const value = parseInt(e.target.value);
               if (!isNaN(value)) {
-                onTimeRangeChange(prev => ({ ...prev, start: value }));
+                onTimeRangeChange({ start: value, end: value + windowSize });
               }
             }}
             placeholder="Start"
           />
           <span>to</span>
           <input 
-            type="text" 
+            type="number" 
             className="time-input" 
-            value={`${timeRange.end.toFixed(2)}s`}
+            value={Math.floor(timeRange.end)}
             onChange={(e) => {
-              const value = parseFloat(e.target.value);
+              const value = parseInt(e.target.value);
               if (!isNaN(value)) {
-                onTimeRangeChange(prev => ({ ...prev, end: value }));
+                onTimeRangeChange({ start: value - windowSize, end: value });
               }
             }}
             placeholder="End"
+          />
+          <label>Window Size:</label>
+          <input 
+            type="number" 
+            className="window-input" 
+            value={windowSize}
+            onChange={(e) => {
+              const value = parseInt(e.target.value);
+              if (!isNaN(value) && value > 0 && value <= 10000) {
+                onWindowSizeChange(value);
+              }
+            }}
+            min="1"
+            max="10000"
+            placeholder="Window"
           />
           <label>Spike Threshold:</label>
           <input 

@@ -43,7 +43,7 @@
   color: #e0e6ed;
   padding: 0.4rem 0.8rem;
   font-size: 0.9rem;
-  width: 80px;
+  width: 100px;
 }
 
 .time-input:focus {
@@ -63,6 +63,22 @@
 }
 
 .threshold-input:focus {
+  outline: none;
+  border-color: #40e0d0;
+  box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
+}
+
+.window-input {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  border-radius: 6px;
+  color: #e0e6ed;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  width: 100px;
+}
+
+.window-input:focus {
   outline: none;
   border-color: #40e0d0;
   box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);

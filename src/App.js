@@ -9,8 +9,8 @@ function App() {
   const [channelScrollOffset, setChannelScrollOffset] = useState(0);
   const [spikeData, setSpikeData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [timeRange, setTimeRange] = useState({ start: 0.0, end: 1000.0 });
-  const [windowSize] = useState(1000);
+  const [timeRange, setTimeRange] = useState({ start: 0, end: 1000 });
+  const [windowSize, setWindowSize] = useState(1000);
   const [spikeThreshold, setSpikeThreshold] = useState(-25);
   const [datasetInfo, setDatasetInfo] = useState({ totalDataPoints: 3500000, totalChannels: 385 });
   
@@ -63,7 +63,7 @@ function App() {
   };
 
   const fetchSpikeData = async () => {
-    const buffer = 5000;
+    const buffer = windowSize;
     const fetchStart = Math.max(0, Math.floor(timeRange.start) - buffer);
     const fetchEnd = Math.min(datasetInfo.totalDataPoints, Math.ceil(timeRange.end) + buffer);
     
@@ -130,6 +130,12 @@ function App() {
     setChannelScrollOffset(newOffset);
   };
 
+  const handleWindowSizeChange = (newSize) => {
+    const currentStart = timeRange.start;
+    setWindowSize(newSize);
+    setTimeRange({ start: currentStart, end: currentStart + newSize });
+  };
+
   return (
     <div className="app">
       <Header 
@@ -141,19 +147,20 @@ function App() {
           selectedChannels={selectedChannels}
           onChannelToggle={handleChannelToggle}
         />
-        <VisualizationArea
-          spikeData={spikeData}
-          selectedChannels={selectedChannels}
-          channelScrollOffset={channelScrollOffset}
-          timeRange={timeRange}
-          windowSize={windowSize}
-          spikeThreshold={spikeThreshold}
-          totalDataPoints={datasetInfo.totalDataPoints}
-          onTimeRangeChange={setTimeRange}
-          onChannelScroll={handleChannelScroll}
-          onSpikeThresholdChange={setSpikeThreshold}
-          isLoading={isLoading}
-        />
+              <VisualizationArea
+                spikeData={spikeData}
+                selectedChannels={selectedChannels}
+                channelScrollOffset={channelScrollOffset}
+                timeRange={timeRange}
+                windowSize={windowSize}
+                spikeThreshold={spikeThreshold}
+                totalDataPoints={datasetInfo.totalDataPoints}
+                onTimeRangeChange={setTimeRange}
+                onWindowSizeChange={handleWindowSizeChange}
+                onChannelScroll={handleChannelScroll}
+                onSpikeThresholdChange={setSpikeThreshold}
+                isLoading={isLoading}
+              />
       </div>
     </div>
   );

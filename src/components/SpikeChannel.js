@@ -52,6 +52,12 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
     const spikeFlags = data.isSpike ? data.isSpike.slice(offsetStart, offsetEnd) : [];
     const timePoints = Array.from({ length: windowData.length }, (_, i) => windowStart + i);
 
+    const spikePeaks = data.spikePeaks || [];
+    const peaksInWindow = spikePeaks.filter(peakIdx => {
+      const adjustedIdx = peakIdx - offsetStart;
+      return adjustedIdx >= 0 && adjustedIdx < windowData.length;
+    }).map(peakIdx => peakIdx - offsetStart);
+
     const plotData = [];
     let currentSegment = null;
     
@@ -115,6 +121,26 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
         showlegend: false,
         hoverinfo: 'x+y',
         connectgaps: false
+      });
+    }
+
+    if (peaksInWindow.length > 0) {
+      const peakX = peaksInWindow.map(idx => timePoints[idx]);
+      const peakY = peaksInWindow.map(idx => windowData[idx]);
+      
+      plotData.push({
+        x: peakX,
+        y: peakY,
+        type: 'scatter',
+        mode: 'markers',
+        marker: { 
+          size: 6,
+          color: '#e0e6ed',
+          symbol: 'star'
+        },
+        showlegend: false,
+        hoverinfo: 'x+y',
+        hovertemplate: 'Peak<br>Time: %{x}s<br>Amplitude: %{y}<extra></extra>'
       });
     }
 

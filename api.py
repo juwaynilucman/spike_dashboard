@@ -52,15 +52,41 @@ def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=
             channel_data = -channel_data
         
         if spike_threshold is not None:
-            is_spike = channel_data <= spike_threshold
+            if invert_data:
+                is_spike = channel_data >= spike_threshold
+            else:
+                is_spike = channel_data <= spike_threshold
         else:
             is_spike = [False] * len(channel_data)
         
-        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time}, inverted: {invert_data})")
+        spike_peaks = []
+        if spike_threshold is not None:
+            in_spike = False
+            spike_start_idx = 0
+            
+            for i in range(len(is_spike)):
+                if is_spike[i] and not in_spike:
+                    in_spike = True
+                    spike_start_idx = i
+                elif (not is_spike[i] or i == len(is_spike) - 1) and in_spike:
+                    spike_end_idx = i if not is_spike[i] else i + 1
+                    spike_segment = channel_data[spike_start_idx:spike_end_idx]
+                    
+                    if len(spike_segment) > 0:
+                        if invert_data:
+                            peak_idx = spike_start_idx + int(np.argmax(spike_segment))
+                        else:
+                            peak_idx = spike_start_idx + int(np.argmin(spike_segment))
+                        spike_peaks.append(peak_idx)
+                    
+                    in_spike = False
+        
+        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time}, inverted: {invert_data}, peaks: {len(spike_peaks)})")
         
         data[channel_id] = {
             'data': channel_data.tolist(),
             'isSpike': is_spike if isinstance(is_spike, list) else is_spike.tolist(),
+            'spikePeaks': spike_peaks,
             'channelId': channel_id,
             'startTime': start_time,
             'endTime': end_time

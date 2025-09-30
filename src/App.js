@@ -138,6 +138,13 @@ function App() {
     setTimeRange({ start: currentStart, end: currentStart + newSize });
   };
 
+  const handleInvertDataChange = (newInvertState) => {
+    setInvertData(newInvertState);
+    if (spikeThreshold !== null) {
+      setSpikeThreshold(-spikeThreshold);
+    }
+  };
+
   return (
     <div className="app">
       <Header 
@@ -162,7 +169,7 @@ function App() {
                 onWindowSizeChange={handleWindowSizeChange}
                 onChannelScroll={handleChannelScroll}
                 onSpikeThresholdChange={setSpikeThreshold}
-                onInvertDataChange={setInvertData}
+                onInvertDataChange={handleInvertDataChange}
                 isLoading={isLoading}
               />
       </div>

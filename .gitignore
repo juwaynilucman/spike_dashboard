@@ -11,6 +11,10 @@ __pycache__/
 
 # Binary files
 *.bin
+*.pt
+
+# Datasets folder (large files)
+datasets/
 
 # Environment variables
 .env

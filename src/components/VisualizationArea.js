@@ -17,7 +17,10 @@ const VisualizationArea = ({
   onChannelScroll,
   onSpikeThresholdChange,
   onInvertDataChange,
-  isLoading 
+  isLoading,
+  usePrecomputedSpikes,
+  onUsePrecomputedChange,
+  precomputedAvailable
 }) => {
   return (
     <div className="visualization-area">
@@ -90,6 +93,15 @@ const VisualizationArea = ({
               onChange={(e) => onInvertDataChange(e.target.checked)}
             />
             <span>Invert Data</span>
+          </label>
+          <label className="precomputed-checkbox" style={{ opacity: precomputedAvailable ? 1 : 0.5 }}>
+            <input 
+              type="checkbox" 
+              checked={usePrecomputedSpikes}
+              onChange={(e) => onUsePrecomputedChange(e.target.checked)}
+              disabled={!precomputedAvailable}
+            />
+            <span>Use Pre-computed Spikes {!precomputedAvailable && '(No spike times loaded)'}</span>
           </label>
         </div>
       </div>

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import VisualizationArea from './components/VisualizationArea';
+import Upload from './components/Upload';
+import ConfirmDialog from './components/ConfirmDialog';
 import './App.css';
 
 function App() {
@@ -14,11 +16,19 @@ function App() {
   const [spikeThreshold, setSpikeThreshold] = useState(-25);
   const [invertData, setInvertData] = useState(false);
   const [datasetInfo, setDatasetInfo] = useState({ totalDataPoints: 3500000, totalChannels: 385 });
+  const [datasets, setDatasets] = useState([]);
+  const [currentDataset, setCurrentDataset] = useState(null);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [usePrecomputedSpikes, setUsePrecomputedSpikes] = useState(false);
+  const [precomputedAvailable, setPrecomputedAvailable] = useState(false);
   
   const dataCache = React.useRef({});
 
   useEffect(() => {
+    fetchDatasets();
     fetchDatasetInfo();
+    checkSpikeTimesAvailable();
   }, []);
 
   useEffect(() => {
@@ -26,7 +36,7 @@ function App() {
       dataCache.current = {};
       fetchSpikeData();
     }
-  }, [selectedChannels, spikeThreshold, invertData]);
+  }, [selectedChannels, spikeThreshold, invertData, usePrecomputedSpikes]);
 
   const fetchTimeoutRef = React.useRef(null);
 
@@ -48,6 +58,22 @@ function App() {
     }
   }, [timeRange]);
 
+  const fetchDatasets = async () => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/datasets`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Available datasets:', data);
+        setDatasets(data.datasets);
+        setCurrentDataset(data.current);
+      }
+    } catch (error) {
+      console.error('Error fetching datasets:', error);
+    }
+  };
+
   const fetchDatasetInfo = async () => {
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
@@ -63,12 +89,118 @@ function App() {
     }
   };
 
+  const checkSpikeTimesAvailable = async () => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/spike-times-available`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Spike times check response:', data);
+        console.log('Setting precomputedAvailable to:', data.available);
+        setPrecomputedAvailable(data.available);
+        if (!data.available) {
+          setUsePrecomputedSpikes(false);
+        } else {
+          console.log('✓ Spike times are available! Checkbox should appear.');
+        }
+      }
+    } catch (error) {
+      console.error('Error checking spike times:', error);
+      setPrecomputedAvailable(false);
+    }
+  };
+
+  const handleDatasetChange = async (datasetName) => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/dataset/set`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dataset: datasetName })
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('Dataset changed:', result);
+        setCurrentDataset(datasetName);
+        setDatasetInfo({
+          totalChannels: result.totalChannels,
+          totalDataPoints: result.totalDataPoints
+        });
+        setTimeout(() => {
+          checkSpikeTimesAvailable();
+        }, 500);
+        dataCache.current = {};
+        fetchSpikeData();
+      }
+    } catch (error) {
+      console.error('Error changing dataset:', error);
+    }
+  };
+
+  const handleUploadComplete = (uploadResult) => {
+    console.log('Upload complete:', uploadResult);
+    setShowUploadModal(false);
+    fetchDatasets();
+    setTimeout(() => {
+      checkSpikeTimesAvailable();
+    }, 1000);
+  };
+
+  const [datasetToDelete, setDatasetToDelete] = React.useState(null);
+
+  const handleDatasetDelete = (datasetName) => {
+    setDatasetToDelete(datasetName);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!datasetToDelete) return;
+
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/dataset/delete`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ dataset: datasetToDelete })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log('Dataset deleted:', result);
+        setShowDeleteConfirm(false);
+        setDatasetToDelete(null);
+        
+        await fetchDatasets();
+        
+        if (datasetToDelete === currentDataset) {
+          await fetchDatasetInfo();
+        }
+      } else {
+        alert(`Error: ${result.error}`);
+        setShowDeleteConfirm(false);
+        setDatasetToDelete(null);
+      }
+    } catch (error) {
+      console.error('Error deleting dataset:', error);
+      alert('Failed to delete dataset');
+      setShowDeleteConfirm(false);
+      setDatasetToDelete(null);
+    }
+  };
+
   const fetchSpikeData = async () => {
     const buffer = windowSize;
     const fetchStart = Math.max(0, Math.floor(timeRange.start) - buffer);
     const fetchEnd = Math.min(datasetInfo.totalDataPoints, Math.ceil(timeRange.end) + buffer);
     
-    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}-${invertData}`;
+    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}-${invertData}-${usePrecomputedSpikes}`;
     const needsFetch = selectedChannels.some(ch => !dataCache.current[`${ch}-${cacheKey}`]);
     
     if (!needsFetch) {
@@ -93,7 +225,8 @@ function App() {
           spikeThreshold: spikeThreshold,
           invertData: invertData,
           startTime: fetchStart,
-          endTime: fetchEnd
+          endTime: fetchEnd,
+          usePrecomputed: usePrecomputedSpikes
         })
       });
       
@@ -150,29 +283,55 @@ function App() {
       <Header 
         totalChannels={datasetInfo.totalChannels}
         activeChannels={selectedChannels.length}
+        datasets={datasets}
+        currentDataset={currentDataset}
+        onDatasetChange={handleDatasetChange}
+        onUploadClick={() => setShowUploadModal(true)}
+        onDatasetDelete={handleDatasetDelete}
       />
       <div className="main-container">
         <Sidebar
           selectedChannels={selectedChannels}
           onChannelToggle={handleChannelToggle}
         />
-              <VisualizationArea
-                spikeData={spikeData}
-                selectedChannels={selectedChannels}
-                channelScrollOffset={channelScrollOffset}
-                timeRange={timeRange}
-                windowSize={windowSize}
-                spikeThreshold={spikeThreshold}
-                invertData={invertData}
-                totalDataPoints={datasetInfo.totalDataPoints}
-                onTimeRangeChange={setTimeRange}
-                onWindowSizeChange={handleWindowSizeChange}
-                onChannelScroll={handleChannelScroll}
-                onSpikeThresholdChange={setSpikeThreshold}
-                onInvertDataChange={handleInvertDataChange}
-                isLoading={isLoading}
-              />
+        <VisualizationArea
+          spikeData={spikeData}
+          selectedChannels={selectedChannels}
+          channelScrollOffset={channelScrollOffset}
+          timeRange={timeRange}
+          windowSize={windowSize}
+          spikeThreshold={spikeThreshold}
+          invertData={invertData}
+          totalDataPoints={datasetInfo.totalDataPoints}
+          onTimeRangeChange={setTimeRange}
+          onWindowSizeChange={handleWindowSizeChange}
+          onChannelScroll={handleChannelScroll}
+          onSpikeThresholdChange={setSpikeThreshold}
+          onInvertDataChange={handleInvertDataChange}
+          isLoading={isLoading}
+          usePrecomputedSpikes={usePrecomputedSpikes}
+          onUsePrecomputedChange={setUsePrecomputedSpikes}
+          precomputedAvailable={precomputedAvailable}
+        />
       </div>
+      {showUploadModal && (
+        <Upload 
+          onUploadComplete={handleUploadComplete}
+          onClose={() => setShowUploadModal(false)}
+        />
+      )}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        title="Delete Dataset"
+        message={`Are you sure you want to delete "${datasetToDelete}"? This action cannot be undone.`}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => {
+          setShowDeleteConfirm(false);
+          setDatasetToDelete(null);
+        }}
+        confirmText="Delete"
+        cancelText="Cancel"
+      />
     </div>
   );
 }

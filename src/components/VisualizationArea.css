@@ -103,3 +103,27 @@
 .invert-checkbox span {
   user-select: none;
 }
+
+.precomputed-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: rgba(94, 234, 212, 0.9);
+  font-size: 0.9rem;
+  margin-left: 1rem;
+  padding-left: 1rem;
+  border-left: 1px solid rgba(64, 224, 208, 0.2);
+}
+
+.precomputed-checkbox input[type="checkbox"] {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #5eead4;
+}
+
+.precomputed-checkbox span {
+  user-select: none;
+  font-weight: 500;
+}

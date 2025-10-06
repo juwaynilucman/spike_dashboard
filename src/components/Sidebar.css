@@ -20,7 +20,7 @@
   flex-direction: column;
   flex: 1;
   overflow: hidden;
-  min-height: 0; /* Allow flex shrinking */
+  min-height: 0;
 }
 
 .control-group h3 {

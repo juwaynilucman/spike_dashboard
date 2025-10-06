@@ -4,7 +4,6 @@ import './ChannelSelector.css';
 const ChannelSelector = ({ selectedChannels, onChannelToggle, isOpen, onToggle }) => {
   const dropdownRef = useRef(null);
 
-  // Generate all 385 channel options
   const channelOptions = Array.from({ length: 385 }, (_, i) => ({
     id: i,
     name: `CH${i + 1}`,
@@ -15,7 +14,6 @@ const ChannelSelector = ({ selectedChannels, onChannelToggle, isOpen, onToggle }
     onChannelToggle(channelId);
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {

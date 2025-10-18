@@ -56,3 +56,39 @@
   font-size: 0.9rem;
 }
 
+.spike-nav-arrows {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: flex;
+  gap: 4px;
+  z-index: 10;
+}
+
+.spike-nav-button {
+  background: rgba(64, 224, 208, 0.3);
+  border: 1px solid rgba(64, 224, 208, 0.5);
+  border-radius: 4px;
+  color: #40e0d0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  padding: 0;
+  backdrop-filter: blur(4px);
+}
+
+.spike-nav-button:hover {
+  background: rgba(64, 224, 208, 0.5);
+  border-color: #40e0d0;
+  transform: scale(1.05);
+}
+
+.spike-nav-button:active {
+  transform: scale(0.95);
+}
+

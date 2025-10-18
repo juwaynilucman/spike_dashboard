@@ -430,6 +430,78 @@ def spike_times_available():
         print(f"Error checking spike times: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/navigate-spike', methods=['POST'])
+def navigate_spike():
+    """Find the next or previous spike time from spike_times_data"""
+    global spike_times_data
+    
+    try:
+        data = request.get_json()
+        current_time = data.get('currentTime', 0)
+        direction = data.get('direction', 'next')  # 'next' or 'prev'
+        channels = data.get('channels', [])
+        
+        if spike_times_data is None:
+            return jsonify({'error': 'No spike times loaded'}), 400
+        
+        # Collect all spike times across requested channels
+        all_spikes = []
+        
+        if isinstance(spike_times_data, np.ndarray):
+            # Global spike times (used for all channels)
+            all_spikes = spike_times_data.tolist() if hasattr(spike_times_data, 'tolist') else list(spike_times_data)
+        elif isinstance(spike_times_data, dict):
+            # Channel-specific spike times
+            for channel_id in channels:
+                # Try both int and str keys since dict keys could be either
+                channel_spikes = spike_times_data.get(channel_id) or spike_times_data.get(str(channel_id))
+                if channel_spikes is not None:
+                    if isinstance(channel_spikes, list):
+                        all_spikes.extend(channel_spikes)
+                    else:
+                        all_spikes.extend(channel_spikes.tolist() if hasattr(channel_spikes, 'tolist') else list(channel_spikes))
+        
+        if not all_spikes:
+            return jsonify({'error': 'No spikes found'}), 404
+        
+        # Sort and remove duplicates
+        unique_spikes = sorted(set(all_spikes))
+        
+        # Find next or previous spike
+        target_spike = None
+        if direction == 'next':
+            # Find first spike after current time
+            for spike_time in unique_spikes:
+                if spike_time > current_time:
+                    target_spike = spike_time
+                    break
+            # Wrap to first spike if no spike found after current time
+            if target_spike is None and unique_spikes:
+                target_spike = unique_spikes[0]
+        else:  # direction == 'prev'
+            # Find last spike before current time
+            for spike_time in reversed(unique_spikes):
+                if spike_time < current_time:
+                    target_spike = spike_time
+                    break
+            # Wrap to last spike if no spike found before current time
+            if target_spike is None and unique_spikes:
+                target_spike = unique_spikes[-1]
+        
+        if target_spike is None:
+            return jsonify({'error': 'No spike found'}), 404
+        
+        print(f"Navigate {direction} from {current_time}: found spike at {target_spike}")
+        
+        return jsonify({
+            'spikeTime': int(target_spike),
+            'totalSpikes': len(unique_spikes)
+        })
+        
+    except Exception as e:
+        print(f"Error in navigate_spike: {e}")
+        return jsonify({'error': str(e)}), 500
+
 def get_precomputed_spike_data(channels, start_time=0, end_time=20000):
     global data_array, spike_times_data
     

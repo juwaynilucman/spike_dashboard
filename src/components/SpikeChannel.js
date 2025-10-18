@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import './SpikeChannel.css';
 
-const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeThreshold, isLoading, selectedDataType, filteredLineColor }) => {
+const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeThreshold, isLoading, selectedDataType, filteredLineColor, usePrecomputedSpikes, onSpikeNavigation }) => {
   const generatePlotData = () => {
     if (!data || !data.data || !isActive) {
       return {
@@ -211,6 +211,24 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
               config={plotData.config}
               style={{ width: '100%', height: '100%' }}
             />
+            {usePrecomputedSpikes && onSpikeNavigation && (
+              <div className="spike-nav-arrows">
+                <button 
+                  className="spike-nav-button spike-nav-prev"
+                  onClick={() => onSpikeNavigation('prev')}
+                  title="Previous spike"
+                >
+                  ◄
+                </button>
+                <button 
+                  className="spike-nav-button spike-nav-next"
+                  onClick={() => onSpikeNavigation('next')}
+                  title="Next spike"
+                >
+                  ►
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="empty-channel">

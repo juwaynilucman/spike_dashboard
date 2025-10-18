@@ -283,6 +283,45 @@ function App() {
     }
   };
 
+  const handleSpikeNavigation = async (direction) => {
+    if (!usePrecomputedSpikes) return;
+
+    try {
+      // Get current center of the view
+      const currentCenter = Math.floor((timeRange.start + timeRange.end) / 2);
+      
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/navigate-spike`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentTime: currentCenter,
+          direction: direction,
+          channels: selectedChannels
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const targetSpike = data.spikeTime;
+        
+        // Center the view on the target spike
+        const halfWindow = Math.floor(windowSize / 2);
+        const newStart = Math.max(0, targetSpike - halfWindow);
+        const newEnd = Math.min(datasetInfo.totalDataPoints, newStart + windowSize);
+        setTimeRange({ start: newStart, end: newEnd });
+        
+        console.log(`Navigated to spike at ${targetSpike} (${data.totalSpikes} total spikes)`);
+      } else {
+        console.error('Failed to navigate spike');
+      }
+    } catch (error) {
+      console.error('Error navigating spike:', error);
+    }
+  };
+
   return (
     <div className="app">
       <Header 
@@ -324,6 +363,7 @@ function App() {
           onFilterTypeChange={setFilterType}
           filteredLineColor={filteredLineColor}
           onFilteredLineColorChange={setFilteredLineColor}
+          onSpikeNavigation={handleSpikeNavigation}
         />
       </div>
       {showUploadModal && (

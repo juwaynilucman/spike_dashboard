@@ -25,7 +25,8 @@ const VisualizationArea = ({
   filterType,
   onFilterTypeChange,
   filteredLineColor,
-  onFilteredLineColorChange
+  onFilteredLineColorChange,
+  onSpikeNavigation
 }) => {
   return (
     <div className="visualization-area">
@@ -159,6 +160,8 @@ const VisualizationArea = ({
         isLoading={isLoading}
         selectedDataType={selectedDataType}
         filteredLineColor={filteredLineColor}
+        usePrecomputedSpikes={usePrecomputedSpikes}
+        onSpikeNavigation={onSpikeNavigation}
       />
 
       <Timeline 

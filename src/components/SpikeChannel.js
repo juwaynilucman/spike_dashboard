@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import './SpikeChannel.css';
 
-const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeThreshold, isLoading }) => {
+const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeThreshold, isLoading, selectedDataType, filteredLineColor }) => {
   const generatePlotData = () => {
     if (!data || !data.data || !isActive) {
       return {
@@ -61,9 +61,12 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
     const plotData = [];
     let currentSegment = null;
     
+    // Only apply spike coloring when "Detected Spikes" is selected
+    const showSpikeColoring = selectedDataType === 'spikes';
+    
     windowData.forEach((value, index) => {
       const timePoint = timePoints[index];
-      const isSpike = spikeFlags[index] || false;
+      const isSpike = showSpikeColoring && (spikeFlags[index] || false);
       const segmentColor = isSpike ? '#ff4444' : '#40e0d0';
       
       if (!currentSegment) {
@@ -124,7 +127,26 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
       });
     }
 
-    if (peaksInWindow.length > 0) {
+    // Add filtered data trace if available and requested
+    if (selectedDataType === 'filtered' && data.filteredData) {
+      const filteredData = data.filteredData.slice(offsetStart, offsetEnd);
+      const filteredTimePoints = Array.from({ length: filteredData.length }, (_, i) => windowStart + i);
+      
+      plotData.push({
+        x: filteredTimePoints,
+        y: filteredData,
+        type: 'scatter',
+        mode: 'lines',
+        line: { color: filteredLineColor || '#FFD700', width: 1.5 },  // Use selected color or default to gold
+        showlegend: false,
+        hoverinfo: 'x+y',
+        name: 'Filtered Data',
+        connectgaps: false
+      });
+    }
+
+    // Only show spike peaks when "Detected Spikes" visualization type is selected
+    if (selectedDataType === 'spikes' && peaksInWindow.length > 0) {
       const peakX = peaksInWindow.map(idx => timePoints[idx]);
       const peakY = peaksInWindow.map(idx => windowData[idx]);
       

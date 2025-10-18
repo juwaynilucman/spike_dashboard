@@ -20,7 +20,12 @@ const VisualizationArea = ({
   isLoading,
   usePrecomputedSpikes,
   onUsePrecomputedChange,
-  precomputedAvailable
+  precomputedAvailable,
+  selectedDataType,
+  filterType,
+  onFilterTypeChange,
+  filteredLineColor,
+  onFilteredLineColorChange
 }) => {
   return (
     <div className="visualization-area">
@@ -68,24 +73,60 @@ const VisualizationArea = ({
             max="10000"
             placeholder="Window"
           />
-          <label>Spike Threshold:</label>
-          <input 
-            type="number" 
-            className="threshold-input" 
-            value={spikeThreshold ?? ''}
-            onChange={(e) => {
-              const inputValue = e.target.value;
-              if (inputValue === '') {
-                onSpikeThresholdChange(null);
-              } else {
-                const value = parseFloat(inputValue);
-                if (!isNaN(value)) {
-                  onSpikeThresholdChange(value);
-                }
-              }
-            }}
-            step="1"
-          />
+          {selectedDataType === 'filtered' && (
+            <>
+              <label>Filter Type:</label>
+              <select 
+                className="filter-type-select" 
+                value={filterType}
+                onChange={(e) => onFilterTypeChange(e.target.value)}
+              >
+                <option value="highpass">High-pass (300 Hz)</option>
+                <option value="lowpass">Low-pass (3000 Hz)</option>
+                <option value="bandpass">Band-pass (300-3000 Hz)</option>
+                <option value="none">None</option>
+              </select>
+              <label>Line Color:</label>
+              <select 
+                className="filter-color-select" 
+                value={filteredLineColor}
+                onChange={(e) => onFilteredLineColorChange(e.target.value)}
+              >
+                <option value="#FFD700">Gold</option>
+                <option value="#FF6B6B">Red</option>
+                <option value="#4ECDC4">Teal</option>
+                <option value="#95E1D3">Mint</option>
+                <option value="#FF8C42">Orange</option>
+                <option value="#C77DFF">Purple</option>
+                <option value="#7FFF00">Chartreuse</option>
+                <option value="#FF1493">Deep Pink</option>
+                <option value="#00CED1">Dark Turquoise</option>
+                <option value="#FFFFFF">White</option>
+              </select>
+            </>
+          )}
+          {selectedDataType === 'spikes' && (
+            <>
+              <label>Spike Threshold:</label>
+              <input 
+                type="number" 
+                className="threshold-input" 
+                value={spikeThreshold ?? ''}
+                onChange={(e) => {
+                  const inputValue = e.target.value;
+                  if (inputValue === '') {
+                    onSpikeThresholdChange(null);
+                  } else {
+                    const value = parseFloat(inputValue);
+                    if (!isNaN(value)) {
+                      onSpikeThresholdChange(value);
+                    }
+                  }
+                }}
+                step="1"
+              />
+            </>
+          )}
           <label className="invert-checkbox">
             <input 
               type="checkbox" 
@@ -94,15 +135,17 @@ const VisualizationArea = ({
             />
             <span>Invert Data</span>
           </label>
-          <label className="precomputed-checkbox" style={{ opacity: precomputedAvailable ? 1 : 0.5 }}>
-            <input 
-              type="checkbox" 
-              checked={usePrecomputedSpikes}
-              onChange={(e) => onUsePrecomputedChange(e.target.checked)}
-              disabled={!precomputedAvailable}
-            />
-            <span>Use Pre-computed Spikes {!precomputedAvailable && '(No spike times loaded)'}</span>
-          </label>
+          {selectedDataType === 'spikes' && (
+            <label className="precomputed-checkbox" style={{ opacity: precomputedAvailable ? 1 : 0.5 }}>
+              <input 
+                type="checkbox" 
+                checked={usePrecomputedSpikes}
+                onChange={(e) => onUsePrecomputedChange(e.target.checked)}
+                disabled={!precomputedAvailable}
+              />
+              <span>Use Pre-computed Spikes {!precomputedAvailable && '(No spike times loaded)'}</span>
+            </label>
+          )}
         </div>
       </div>
 
@@ -114,6 +157,8 @@ const VisualizationArea = ({
         windowSize={windowSize}
         onChannelScroll={onChannelScroll}
         isLoading={isLoading}
+        selectedDataType={selectedDataType}
+        filteredLineColor={filteredLineColor}
       />
 
       <Timeline 

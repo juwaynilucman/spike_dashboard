@@ -2,7 +2,7 @@ import React from 'react';
 import SpikeChannel from './SpikeChannel';
 import './SpikeGrid.css';
 
-const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange, windowSize, spikeThreshold, onChannelScroll, isLoading }) => {
+const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange, windowSize, spikeThreshold, onChannelScroll, isLoading, selectedDataType, filteredLineColor }) => {
   const displayChannels = selectedChannels.slice(channelScrollOffset, channelScrollOffset + 3);
   
   const gridChannels = Array.from({ length: 3 }, (_, index) => {
@@ -31,6 +31,8 @@ const SpikeGrid = ({ spikeData, selectedChannels, channelScrollOffset, timeRange
             windowSize={windowSize}
             spikeThreshold={spikeThreshold}
             isLoading={isLoading}
+            selectedDataType={selectedDataType}
+            filteredLineColor={filteredLineColor}
           />
         ))}
       </div>

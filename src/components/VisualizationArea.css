@@ -84,6 +84,50 @@
   box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
 }
 
+.filter-type-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  border-radius: 6px;
+  color: #e0e6ed;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  width: 200px;
+  cursor: pointer;
+}
+
+.filter-type-select:focus {
+  outline: none;
+  border-color: #40e0d0;
+  box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
+}
+
+.filter-type-select option {
+  background: #1a1a2e;
+  color: #e0e6ed;
+}
+
+.filter-color-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  border-radius: 6px;
+  color: #e0e6ed;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  width: 140px;
+  cursor: pointer;
+}
+
+.filter-color-select:focus {
+  outline: none;
+  border-color: #40e0d0;
+  box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
+}
+
+.filter-color-select option {
+  background: #1a1a2e;
+  color: #e0e6ed;
+}
+
 .invert-checkbox {
   display: flex;
   align-items: center;

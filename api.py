@@ -5,6 +5,7 @@ import json
 import os
 from werkzeug.utils import secure_filename
 import torch
+from scipy.signal import butter, filtfilt
 
 app = Flask(__name__)
 CORS(app)
@@ -99,6 +100,55 @@ def migrate_existing_labels():
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def apply_filter(data, filter_type='highpass', sampling_rate=30000, order=4):
+    """
+    Apply various types of Butterworth filters to the signal
+    
+    Args:
+        data: 1D numpy array of signal data
+        filter_type: type of filter ('highpass', 'lowpass', 'bandpass')
+        sampling_rate: sampling rate of the signal in Hz (default 30 kHz)
+        order: order of the Butterworth filter (default 4)
+    
+    Returns:
+        filtered_data: 1D numpy array of filtered signal
+    """
+    try:
+        nyquist = sampling_rate / 2.0
+        
+        if filter_type == 'highpass':
+            # High-pass: remove low frequencies (< 300 Hz)
+            cutoff_freq = 300
+            normalized_cutoff = cutoff_freq / nyquist
+            b, a = butter(order, normalized_cutoff, btype='high', analog=False)
+            
+        elif filter_type == 'lowpass':
+            # Low-pass: remove high frequencies (> 3000 Hz)
+            cutoff_freq = 3000
+            normalized_cutoff = cutoff_freq / nyquist
+            b, a = butter(order, normalized_cutoff, btype='low', analog=False)
+            
+        elif filter_type == 'bandpass':
+            # Band-pass: keep frequencies between 300-3000 Hz
+            low_cutoff = 300
+            high_cutoff = 3000
+            low_normalized = low_cutoff / nyquist
+            high_normalized = high_cutoff / nyquist
+            b, a = butter(order, [low_normalized, high_normalized], btype='band', analog=False)
+            
+        else:
+            # Unknown filter type, return original data
+            print(f"Unknown filter type: {filter_type}")
+            return data
+        
+        # Apply the filter using filtfilt for zero-phase filtering
+        filtered_data = filtfilt(b, a, data)
+        
+        return filtered_data
+    except Exception as e:
+        print(f"Error applying {filter_type} filter: {e}")
+        return data  # Return original data if filtering fails
 
 def load_spike_times(dataset_filename):
     """Load spike times file associated with a dataset using the mapping database"""
@@ -209,7 +259,7 @@ def load_binary_data(filename=None):
         traceback.print_exc()
         return None
 
-def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=0, end_time=20000):
+def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=0, end_time=20000, data_type='raw', filter_type='highpass'):
     global data_array
     
     if data_array is None:
@@ -229,8 +279,34 @@ def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=
             
         channel_data = data_array[array_index, start_time:end_time]
         
+        # Apply filtering if requested
+        filtered_data = None
+        if data_type == 'filtered' and filter_type != 'none':
+            # Need a larger buffer for filtering to avoid edge effects
+            buffer = 100
+            buffer_start = max(0, start_time - buffer)
+            buffer_end = min(total_available, end_time + buffer)
+            buffered_data = data_array[array_index, buffer_start:buffer_end]
+            
+            # Store the baseline (mean) of the original signal
+            original_mean = np.mean(channel_data)
+            
+            # Apply the selected filter
+            filtered_buffered = apply_filter(buffered_data.astype(float), filter_type=filter_type)
+            
+            # Extract the relevant portion
+            offset = start_time - buffer_start
+            filtered_data = filtered_buffered[offset:offset + len(channel_data)]
+            
+            # Add back the original baseline for filters that remove DC offset
+            # High-pass and band-pass filters remove DC, low-pass preserves it
+            if filter_type in ['highpass', 'bandpass']:
+                filtered_data = filtered_data + original_mean
+        
         if invert_data:
             channel_data = -channel_data
+            if filtered_data is not None:
+                filtered_data = -filtered_data
         
         if spike_threshold is not None:
             if invert_data:
@@ -262,7 +338,7 @@ def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=
                     
                     in_spike = False
         
-        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time}, inverted: {invert_data}, peaks: {len(spike_peaks)})")
+        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time}, type: {data_type}, inverted: {invert_data}, peaks: {len(spike_peaks)})")
         
         data[channel_id] = {
             'data': channel_data.tolist(),
@@ -272,6 +348,10 @@ def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=
             'startTime': start_time,
             'endTime': end_time
         }
+        
+        # Add filtered data if available
+        if filtered_data is not None:
+            data[channel_id]['filteredData'] = np.round(filtered_data).astype(int).tolist()
     
     return data
 
@@ -303,6 +383,8 @@ def get_spike_data():
         start_time = data.get('startTime', 0)
         end_time = data.get('endTime', 20000)
         use_precomputed = data.get('usePrecomputed', False)
+        data_type = data.get('dataType', 'raw')  # 'raw', 'filtered', or 'spikes'
+        filter_type = data.get('filterType', 'highpass')  # 'none', 'highpass', 'lowpass', 'bandpass'
         
         max_points = 20000
         end_time = min(end_time, start_time + max_points)
@@ -310,7 +392,7 @@ def get_spike_data():
         if use_precomputed and spike_times_data.any():
             spike_data = get_precomputed_spike_data(channels, start_time, end_time)
         else:
-            spike_data = get_real_data(channels, spike_threshold, invert_data, start_time, end_time)
+            spike_data = get_real_data(channels, spike_threshold, invert_data, start_time, end_time, data_type, filter_type)
         
         return jsonify(spike_data)
         

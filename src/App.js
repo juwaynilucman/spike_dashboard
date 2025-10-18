@@ -22,6 +22,9 @@ function App() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [usePrecomputedSpikes, setUsePrecomputedSpikes] = useState(false);
   const [precomputedAvailable, setPrecomputedAvailable] = useState(false);
+  const [selectedDataType, setSelectedDataType] = useState('raw'); // 'raw', 'filtered', or 'spikes'
+  const [filterType, setFilterType] = useState('highpass'); // 'none', 'highpass', 'lowpass', 'bandpass', 'bandstop'
+  const [filteredLineColor, setFilteredLineColor] = useState('#FFD700'); // Color for filtered data line
   
   const dataCache = React.useRef({});
 
@@ -36,7 +39,7 @@ function App() {
       dataCache.current = {};
       fetchSpikeData();
     }
-  }, [selectedChannels, spikeThreshold, invertData, usePrecomputedSpikes]);
+  }, [selectedChannels, spikeThreshold, invertData, usePrecomputedSpikes, selectedDataType, filterType]);
 
   const fetchTimeoutRef = React.useRef(null);
 
@@ -200,7 +203,7 @@ function App() {
     const fetchStart = Math.max(0, Math.floor(timeRange.start) - buffer);
     const fetchEnd = Math.min(datasetInfo.totalDataPoints, Math.ceil(timeRange.end) + buffer);
     
-    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}-${invertData}-${usePrecomputedSpikes}`;
+    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}-${invertData}-${usePrecomputedSpikes}-${selectedDataType}-${filterType}`;
     const needsFetch = selectedChannels.some(ch => !dataCache.current[`${ch}-${cacheKey}`]);
     
     if (!needsFetch) {
@@ -226,7 +229,9 @@ function App() {
           invertData: invertData,
           startTime: fetchStart,
           endTime: fetchEnd,
-          usePrecomputed: usePrecomputedSpikes
+          usePrecomputed: usePrecomputedSpikes,
+          dataType: selectedDataType,
+          filterType: filterType
         })
       });
       
@@ -293,6 +298,8 @@ function App() {
         <Sidebar
           selectedChannels={selectedChannels}
           onChannelToggle={handleChannelToggle}
+          selectedDataType={selectedDataType}
+          onDataTypeChange={setSelectedDataType}
         />
         <VisualizationArea
           spikeData={spikeData}
@@ -312,6 +319,11 @@ function App() {
           usePrecomputedSpikes={usePrecomputedSpikes}
           onUsePrecomputedChange={setUsePrecomputedSpikes}
           precomputedAvailable={precomputedAvailable}
+          selectedDataType={selectedDataType}
+          filterType={filterType}
+          onFilterTypeChange={setFilterType}
+          filteredLineColor={filteredLineColor}
+          onFilteredLineColorChange={setFilteredLineColor}
         />
       </div>
       {showUploadModal && (

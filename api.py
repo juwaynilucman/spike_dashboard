@@ -11,8 +11,8 @@ app = Flask(__name__)
 CORS(app)
 
 DATASETS_FOLDER = 'datasets'
-LABELS_FOLDER = 'datasets\labels'
-MAPPING_DB_PATH = 'datasets/dataset_labels_mapping.json'
+LABELS_FOLDER = os.path.join('datasets', 'labels')
+MAPPING_DB_PATH = os.path.join('datasets', 'dataset_labels_mapping.json')
 ALLOWED_EXTENSIONS = {'bin', 'dat', 'raw', 'pt'}
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024 * 1024
 
@@ -154,44 +154,54 @@ def load_spike_times(dataset_filename):
     """Load spike times file associated with a dataset using the mapping database"""
     global spike_times_data
     
+    print(f"\n=== Loading spike times for: {dataset_filename} ===")
     spike_times_data = None
     
     label_filename = get_label_filename(dataset_filename)
+    print(f"Label filename from mapping: {label_filename}")
     
     if not label_filename:
-        print(f"No label mapping found for dataset: {dataset_filename}")
+        print(f"❌ No label mapping found for dataset: {dataset_filename}")
+        print(f"Available mappings: {list(dataset_label_mapping.keys())}")
         return False
     
     spike_path = os.path.join(LABELS_FOLDER, label_filename)
+    print(f"Looking for spike times at: {spike_path}")
+    print(f"File exists: {os.path.exists(spike_path)}")
     
     if not os.path.exists(spike_path):
-        print(f"Label file not found: {spike_path}")
+        print(f"❌ Label file not found: {spike_path}")
+        print(f"LABELS_FOLDER: {LABELS_FOLDER}")
         return False
     
     try:
-        print(f"Loading spike times from: {spike_path}")
+        print(f"📂 Loading spike times from: {spike_path}")
         loaded_data = torch.load(spike_path, weights_only=False)
-        print(f"Loaded spike times: {type(loaded_data)}")
+        print(f"Loaded data type: {type(loaded_data)}")
         
         if isinstance(loaded_data, np.ndarray):
             spike_times_data = loaded_data
-            print(f"Using spike times as global list for all channels: {len(spike_times_data)} spikes")
+            print(f"✓ Using spike times as numpy array: {len(spike_times_data)} spikes")
         elif torch.is_tensor(loaded_data):
-            spike_times_data = loaded_data.tolist()
-            print(f"Using spike times as global list for all channels: {len(spike_times_data)} spikes")
+            spike_times_data = loaded_data.numpy()
+            print(f"✓ Converted torch tensor to numpy array: {len(spike_times_data)} spikes")
         elif isinstance(loaded_data, dict):
             spike_times_data = {}
             for key in loaded_data:
                 if torch.is_tensor(loaded_data[key]):
-                    spike_times_data[key] = loaded_data[key].tolist()
+                    spike_times_data[key] = loaded_data[key].numpy()
                 else:
                     spike_times_data[key] = loaded_data[key]
-            print(f"Using channel-specific spike times: {list(spike_times_data.keys())}")
+            print(f"✓ Using channel-specific spike times: {len(spike_times_data)} channels")
+            print(f"  Channel keys: {list(spike_times_data.keys())[:10]}...")  # Show first 10
         
-        print(f"✓ Spike times loaded successfully!")
+        print(f"✓✓✓ Spike times loaded successfully! ✓✓✓")
+        print(f"spike_times_data is now: {type(spike_times_data)}")
         return True
     except Exception as e:
-        print(f"Error loading spike times from {spike_path}: {e}")
+        print(f"❌ Error loading spike times from {spike_path}: {e}")
+        import traceback
+        traceback.print_exc()
         spike_times_data = None
         return False
 
@@ -212,28 +222,46 @@ def load_binary_data(filename=None):
         file_ext = os.path.splitext(filename)[1].lower()
         
         if file_ext == '.pt':
-            print(f"Loading PyTorch tensor from {dataset_path}")
-            tensor_data = torch.load(dataset_path, weights_only=False)
+            # Check for memory-mapped version first (optimization)
+            npy_path = dataset_path.replace('.pt', '_mmap.npy')
+            shape_path = dataset_path.replace('.pt', '_shape.txt')
             
-            if torch.is_tensor(tensor_data):
-                data_array = tensor_data.numpy()
-            elif isinstance(tensor_data, np.ndarray):
-                data_array = tensor_data
+            if os.path.exists(npy_path) and os.path.exists(shape_path):
+                print(f"🚀 Loading memory-mapped array from {npy_path}")
+                with open(shape_path, 'r') as f:
+                    shape = tuple(map(int, f.read().strip().split(',')))
+                data_array = np.memmap(npy_path, dtype=np.int16, mode='r', shape=shape)
+                nrows = data_array.shape[0]
+                current_dataset = filename
+                print(f"✓ Memory-mapped data loaded: {data_array.shape}, channels: {nrows}")
+                print(f"💾 Memory usage: Minimal (~only accessed pages)")
             else:
-                print(f"Error: Unexpected data type in .pt file: {type(tensor_data)}")
-                return None
-            
-            if data_array.ndim == 2:
-                if data_array.shape[0] > data_array.shape[1]:
-                    print(f"Transposing data from {data_array.shape} to ({data_array.shape[1]}, {data_array.shape[0]})")
-                    data_array = data_array.T
-            else:
-                print(f"Error: Expected 2D array, got shape: {data_array.shape}")
-                return None
-            
-            nrows = data_array.shape[0]
-            current_dataset = filename
-            print(f"Loaded PyTorch data from {dataset_path} with shape: {data_array.shape}, channels: {nrows}")
+                print(f"Loading PyTorch tensor from {dataset_path}")
+                print(f"⚠️  WARNING: Loading full {os.path.getsize(dataset_path)/(1024**3):.2f} GB into RAM")
+                print(f"💡 TIP: Convert to memory-mapped format to eliminate disk I/O:")
+                print(f"    python convert_pt_to_mmap.py {dataset_path}")
+                
+                tensor_data = torch.load(dataset_path, weights_only=False)
+                
+                if torch.is_tensor(tensor_data):
+                    data_array = tensor_data.numpy()
+                elif isinstance(tensor_data, np.ndarray):
+                    data_array = tensor_data
+                else:
+                    print(f"Error: Unexpected data type in .pt file: {type(tensor_data)}")
+                    return None
+                
+                if data_array.ndim == 2:
+                    if data_array.shape[0] > data_array.shape[1]:
+                        print(f"Transposing data from {data_array.shape} to ({data_array.shape[1]}, {data_array.shape[0]})")
+                        data_array = data_array.T
+                else:
+                    print(f"Error: Expected 2D array, got shape: {data_array.shape}")
+                    return None
+                
+                nrows = data_array.shape[0]
+                current_dataset = filename
+                print(f"Loaded PyTorch data from {dataset_path} with shape: {data_array.shape}, channels: {nrows}")
             
             load_spike_times(filename)
             
@@ -994,20 +1022,39 @@ if __name__ == '__main__':
     print("Starting Spike Visualizer API...")
     print("=" * 60)
     
+    print("\n1. Loading mapping database...")
     load_mapping_database()
+    
+    print("\n2. Migrating existing labels...")
     migrate_existing_labels()
     
+    print(f"\n3. Loading default dataset: {current_dataset}")
     load_binary_data()
     
-    print(f"\nStatus:")
+    print(f"\n{'='*60}")
+    print("STARTUP STATUS:")
+    print(f"{'='*60}")
     print(f"  Data loaded: {data_array is not None}")
+    if data_array is not None:
+        print(f"  Data shape: {data_array.shape}")
     print(f"  Total channels: {nrows}")
+    print(f"  Current dataset: {current_dataset}")
     print(f"  Spike times loaded: {spike_times_data is not None}")
+    if spike_times_data is not None:
+        print(f"  Spike times type: {type(spike_times_data)}")
+        if isinstance(spike_times_data, (np.ndarray, list)):
+            print(f"  Spike count: {len(spike_times_data)}")
+        elif isinstance(spike_times_data, dict):
+            print(f"  Spike channels: {len(spike_times_data)}")
     print(f"  Dataset-Label mappings: {len(dataset_label_mapping)}")
     if dataset_label_mapping:
-        print(f"\nMappings:")
+        print(f"\nLabel Mappings:")
         for dataset, label in dataset_label_mapping.items():
-            print(f"    {dataset} -> {label}")
+            label_path = os.path.join(LABELS_FOLDER, label)
+            exists = "✓" if os.path.exists(label_path) else "✗"
+            print(f"    {exists} {dataset} -> {label}")
+    print("=" * 60)
+    print("\nAPI Server starting on http://localhost:5000")
     print("=" * 60)
     
     app.run(debug=True, host='0.0.0.0', port=5000)

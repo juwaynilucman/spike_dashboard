@@ -415,7 +415,12 @@ def spike_times_available():
     try:
         is_available = spike_times_data is not None
         
-        if isinstance(spike_times_data, list):
+        if isinstance(spike_times_data, np.ndarray):
+            # Numpy array - global spike times
+            spike_type = 'global'
+            spike_count = len(spike_times_data)
+            channels = []
+        elif isinstance(spike_times_data, list):
             spike_type = 'global'
             spike_count = len(spike_times_data)
             channels = []
@@ -428,7 +433,7 @@ def spike_times_available():
             spike_count = 0
             channels = []
         
-        print(f"Spike times check: available={is_available}, type={spike_type}, count={spike_count}")
+        print(f"Spike times check: available={is_available}, type={spike_type}, count={spike_count}, data_type={type(spike_times_data)}")
         
         return jsonify({
             'available': is_available,

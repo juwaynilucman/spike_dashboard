@@ -30,9 +30,12 @@ function App() {
   const dataCache = React.useRef({});
 
   useEffect(() => {
-    fetchDatasets();
-    // Load c46 dataset by default on initial mount
-    handleDatasetChange('c46_data_5percent.pt');
+    const initializeApp = async () => {
+      await fetchDatasets();
+      // Load c46 dataset by default on initial mount
+      await handleDatasetChange('c46_data_5percent.pt');
+    };
+    initializeApp();
   }, []);
 
   useEffect(() => {
@@ -140,10 +143,14 @@ function App() {
           setSelectedChannels([179, 181, 183]);
         }
         
-        setTimeout(() => {
-          checkSpikeTimesAvailable();
-        }, 500);
         dataCache.current = {};
+        
+        // Wait a bit longer for backend to fully load dataset and spike times
+        // then check if precomputed spikes are available
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await checkSpikeTimesAvailable();
+        
+        // Fetch data after everything is initialized
         fetchSpikeData();
       }
     } catch (error) {

@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 import './SpikeChannel.css';
 
-const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeThreshold, isLoading, selectedDataType, filteredLineColor, usePrecomputedSpikes, onSpikeNavigation }) => {
+const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeThreshold, isLoading, selectedDataType, filteredLineColor, usePrecomputedSpikes, onSpikeNavigation, filterType }) => {
   const generatePlotData = () => {
     if (!data || !data.data || !isActive) {
       return {

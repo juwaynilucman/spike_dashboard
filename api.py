@@ -279,9 +279,11 @@ def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=
             
         channel_data = data_array[array_index, start_time:end_time]
         
-        # Apply filtering if requested
+        # Apply filtering if requested (for both filtered and spikes mode)
         filtered_data = None
-        if data_type == 'filtered' and filter_type != 'none':
+        original_raw_data = channel_data.copy()  # Always preserve original raw data
+        
+        if filter_type != 'none':
             # Need a larger buffer for filtering to avoid edge effects
             buffer = 100
             buffer_start = max(0, start_time - buffer)
@@ -302,6 +304,14 @@ def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=
             # High-pass and band-pass filters remove DC, low-pass preserves it
             if filter_type in ['highpass', 'bandpass']:
                 filtered_data = filtered_data + original_mean
+            
+            # For spikes mode, replace the raw data with filtered data
+            # For filtered mode, keep both raw and filtered
+            if data_type == 'spikes':
+                channel_data = np.round(filtered_data).astype(int)
+            elif data_type == 'filtered':
+                # Keep original raw data and store filtered data separately
+                channel_data = original_raw_data
         
         if invert_data:
             channel_data = -channel_data
@@ -338,7 +348,7 @@ def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=
                     
                     in_spike = False
         
-        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time}, type: {data_type}, inverted: {invert_data}, peaks: {len(spike_peaks)})")
+        print(f"Channel {channel_id}: Sending {len(channel_data)} points (range: {start_time}-{end_time}, type: {data_type}, filter: {filter_type}, inverted: {invert_data}, peaks: {len(spike_peaks)})")
         
         data[channel_id] = {
             'data': channel_data.tolist(),
@@ -389,8 +399,8 @@ def get_spike_data():
         max_points = 20000
         end_time = min(end_time, start_time + max_points)
 
-        if use_precomputed and spike_times_data.any():
-            spike_data = get_precomputed_spike_data(channels, start_time, end_time)
+        if use_precomputed and spike_times_data is not None:
+            spike_data = get_precomputed_spike_data(channels, start_time, end_time, filter_type, invert_data, data_type)
         else:
             spike_data = get_real_data(channels, spike_threshold, invert_data, start_time, end_time, data_type, filter_type)
         
@@ -502,12 +512,13 @@ def navigate_spike():
         print(f"Error in navigate_spike: {e}")
         return jsonify({'error': str(e)}), 500
 
-def get_precomputed_spike_data(channels, start_time=0, end_time=20000):
+def get_precomputed_spike_data(channels, start_time=0, end_time=20000, filter_type='none', invert_data=False, data_type='spikes'):
     global data_array, spike_times_data
     
     if data_array is None or spike_times_data is None:
         return None
     
+    total_available = data_array.shape[1]
     data = {}
     spike_window = 5
 
@@ -525,6 +536,44 @@ def get_precomputed_spike_data(channels, start_time=0, end_time=20000):
             continue
             
         channel_data = data_array[array_index, start_time:end_time]
+        original_raw_data = channel_data.copy()  # Always preserve original raw data
+        filtered_data_array = None
+        
+        # Apply filtering if requested
+        if filter_type != 'none':
+            # Need a larger buffer for filtering to avoid edge effects
+            buffer = 100
+            buffer_start = max(0, start_time - buffer)
+            buffer_end = min(total_available, end_time + buffer)
+            buffered_data = data_array[array_index, buffer_start:buffer_end]
+            
+            # Store the baseline (mean) of the original signal
+            original_mean = np.mean(channel_data)
+            
+            # Apply the selected filter
+            filtered_buffered = apply_filter(buffered_data.astype(float), filter_type=filter_type)
+            
+            # Extract the relevant portion
+            offset = start_time - buffer_start
+            filtered_data_array = filtered_buffered[offset:offset + len(channel_data)]
+            
+            # Add back the original baseline for filters that remove DC offset
+            if filter_type in ['highpass', 'bandpass']:
+                filtered_data_array = filtered_data_array + original_mean
+            
+            # For spikes mode, replace the raw data with filtered data
+            # For filtered mode, keep both raw and filtered
+            if data_type == 'spikes':
+                channel_data = np.round(filtered_data_array).astype(int)
+            elif data_type == 'filtered':
+                # Keep original raw data and store filtered data separately
+                channel_data = original_raw_data
+        
+        # Apply invert if requested
+        if invert_data:
+            channel_data = -channel_data
+            if filtered_data_array is not None:
+                filtered_data_array = -filtered_data_array
         
         if is_global:
             spike_times_list = all_spike_times
@@ -541,7 +590,7 @@ def get_precomputed_spike_data(channels, start_time=0, end_time=20000):
                 if 0 <= idx < len(is_spike):
                     is_spike[idx] = True
         
-        print(f"Channel {channel_id}: {len(spike_peaks)} spikes (±{spike_window} window), global={is_global}")
+        print(f"Channel {channel_id}: {len(spike_peaks)} spikes (±{spike_window} window), filter={filter_type}, data_type={data_type}, global={is_global}")
         
         data[channel_id] = {
             'data': channel_data.tolist(),
@@ -552,6 +601,10 @@ def get_precomputed_spike_data(channels, start_time=0, end_time=20000):
             'endTime': end_time,
             'precomputed': True
         }
+        
+        # Add filtered data if available (for filtered mode overlay)
+        if filtered_data_array is not None and data_type == 'filtered':
+            data[channel_id]['filteredData'] = np.round(filtered_data_array).astype(int).tolist()
     
     return data
 

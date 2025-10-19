@@ -108,6 +108,17 @@ const VisualizationArea = ({
           )}
           {selectedDataType === 'spikes' && (
             <>
+              <label>Filter Type:</label>
+              <select 
+                className="filter-type-select" 
+                value={filterType}
+                onChange={(e) => onFilterTypeChange(e.target.value)}
+              >
+                <option value="none">None (Raw Data)</option>
+                <option value="highpass">High-pass (300 Hz)</option>
+                <option value="lowpass">Low-pass (3000 Hz)</option>
+                <option value="bandpass">Band-pass (300-3000 Hz)</option>
+              </select>
               <label>Spike Threshold:</label>
               <input 
                 type="number" 
@@ -150,19 +161,20 @@ const VisualizationArea = ({
         </div>
       </div>
 
-      <SpikeGrid 
-        spikeData={spikeData}
-        selectedChannels={selectedChannels}
-        channelScrollOffset={channelScrollOffset}
-        timeRange={timeRange}
-        windowSize={windowSize}
-        onChannelScroll={onChannelScroll}
-        isLoading={isLoading}
-        selectedDataType={selectedDataType}
-        filteredLineColor={filteredLineColor}
-        usePrecomputedSpikes={usePrecomputedSpikes}
-        onSpikeNavigation={onSpikeNavigation}
-      />
+       <SpikeGrid 
+         spikeData={spikeData}
+         selectedChannels={selectedChannels}
+         channelScrollOffset={channelScrollOffset}
+         timeRange={timeRange}
+         windowSize={windowSize}
+         onChannelScroll={onChannelScroll}
+         isLoading={isLoading}
+         selectedDataType={selectedDataType}
+         filteredLineColor={filteredLineColor}
+         usePrecomputedSpikes={usePrecomputedSpikes}
+         onSpikeNavigation={onSpikeNavigation}
+         filterType={filterType}
+       />
 
       <Timeline 
         timeRange={timeRange}

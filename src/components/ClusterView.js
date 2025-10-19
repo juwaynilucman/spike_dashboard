@@ -2,16 +2,29 @@ import React, { useState, useEffect, useRef } from 'react';
 import Plot from 'react-plotly.js';
 import './ClusterView.css';
 
-const ClusterView = ({ selectedDataset }) => {
+const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const [clusterData, setClusterData] = useState(null);
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [spikePreview, setSpikePreview] = useState(null);
-  const [selectedChannels, setSelectedChannels] = useState({ 0: 1, 1: 2, 2: 3 });
+  const [selectedChannels, setSelectedChannels] = useState({ 0: 179, 1: 181, 2: 183 });
+  const [filterType, setFilterType] = useState('highpass');
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
   useEffect(() => {
     fetchClusterData();
+    
+    // Reset channels to default for c46 dataset
+    if (selectedDataset === 'c46') {
+      setSelectedChannels({ 0: 179, 1: 181, 2: 183 });
+    }
   }, [selectedDataset]);
+
+  // Re-fetch spike preview when filter type changes
+  useEffect(() => {
+    if (hoveredPoint) {
+      fetchSpikePreview(hoveredPoint.cluster, hoveredPoint.index);
+    }
+  }, [filterType]);
 
   const fetchClusterData = async () => {
     try {
@@ -41,7 +54,8 @@ const ClusterView = ({ selectedDataset }) => {
         body: JSON.stringify({
           spikeIndex: pointIndex,
           channelId: channelId,
-          window: 10
+          window: 10,
+          filterType: filterType
         })
       });
       
@@ -78,6 +92,48 @@ const ClusterView = ({ selectedDataset }) => {
     setSpikePreview(null);
   };
 
+  const handlePointClick = (event) => {
+    if (event.points && event.points.length > 0) {
+      const point = event.points[0];
+      const clusterIndex = point.curveNumber;
+      const pointIndex = point.pointIndex;
+      const channelId = selectedChannels[clusterIndex];
+      
+      // Fetch spike preview to get the spike time
+      fetchSpikePreviewForNavigation(clusterIndex, pointIndex, channelId);
+    }
+  };
+
+  const fetchSpikePreviewForNavigation = async (clusterIndex, pointIndex, channelId) => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/spike-preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          spikeIndex: pointIndex,
+          channelId: channelId,
+          window: 10,
+          filterType: filterType
+        })
+      });
+      
+      if (response.ok) {
+        const preview = await response.json();
+        // Navigate to the spike in Detected Spikes view with all 3 cluster channels
+        if (onNavigateToSpike) {
+          const allClusterChannels = [selectedChannels[0], selectedChannels[1], selectedChannels[2]];
+          onNavigateToSpike(preview.spikeTime, channelId, allClusterChannels);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching spike for navigation:', error);
+    }
+  };
+
   const generatePlotData = () => {
     if (!clusterData) return [];
 
@@ -106,30 +162,49 @@ const ClusterView = ({ selectedDataset }) => {
   const generatePreviewPlot = () => {
     if (!spikePreview || !spikePreview.waveform) return null;
 
+    // Calculate actual time points relative to spike time
+    const spikeTime = spikePreview.spikeTime;
+    const window = spikePreview.window || 10;
+    const startTime = spikeTime - window;
     const timePoints = Array.from(
       { length: spikePreview.waveform.length }, 
-      (_, i) => i - 10
+      (_, i) => startTime + i
     );
 
     return {
-      data: [{
-        x: timePoints,
-        y: spikePreview.waveform,
-        type: 'scatter',
-        mode: 'lines',
-        line: { color: '#40e0d0', width: 2 },
-        fill: 'tozeroy',
-        fillcolor: 'rgba(64, 224, 208, 0.2)'
-      }],
+      data: [
+        {
+          x: timePoints,
+          y: spikePreview.waveform,
+          type: 'scatter',
+          mode: 'lines',
+          line: { color: '#40e0d0', width: 2 },
+          fill: 'tozeroy',
+          fillcolor: 'rgba(64, 224, 208, 0.2)'
+        },
+        {
+          // Vertical line at spike time
+          x: [spikeTime, spikeTime],
+          y: [Math.min(...spikePreview.waveform), Math.max(...spikePreview.waveform)],
+          type: 'scatter',
+          mode: 'lines',
+          line: { color: 'rgba(255, 255, 255, 0.5)', width: 2, dash: 'dash' },
+          hoverinfo: 'skip',
+          showlegend: false
+        }
+      ],
       layout: {
         width: 300,
         height: 200,
-        margin: { l: 40, r: 20, t: 30, b: 40 },
+        margin: { l: 40, r: 20, t: 30, b: 50 },
         paper_bgcolor: 'rgba(26, 26, 46, 0.95)',
         plot_bgcolor: 'rgba(0, 0, 0, 0.3)',
         font: { color: '#e0e6ed', size: 10 },
         xaxis: {
-          title: 'Time (samples)',
+          title: {
+            text: 'Time (samples)',
+            standoff: 15
+          },
           gridcolor: 'rgba(64, 224, 208, 0.2)',
           color: '#e0e6ed'
         },
@@ -141,7 +216,15 @@ const ClusterView = ({ selectedDataset }) => {
         title: {
           text: `CH${spikePreview.channelId} - Spike ${spikePreview.spikeIndex}`,
           font: { size: 12, color: '#40e0d0' }
-        }
+        },
+        annotations: [{
+          x: spikeTime,
+          y: Math.max(...spikePreview.waveform),
+          text: 'Spike',
+          showarrow: false,
+          yshift: 10,
+          font: { color: 'rgba(255, 255, 255, 0.7)', size: 9 }
+        }]
       },
       config: {
         displayModeBar: false,
@@ -162,6 +245,19 @@ const ClusterView = ({ selectedDataset }) => {
       <div className="cluster-header">
         <h2>Spike Cluster Visualization</h2>
         <div className="cluster-controls">
+          <div className="filter-selector">
+            <label>Filter Type:</label>
+            <select 
+              className="filter-select" 
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option value="none">None (Raw Data)</option>
+              <option value="highpass">High-pass (300 Hz)</option>
+              <option value="lowpass">Low-pass (3000 Hz)</option>
+              <option value="bandpass">Band-pass (300-3000 Hz)</option>
+            </select>
+          </div>
           <div className="channel-selectors">
             {[0, 1, 2].map(clusterIdx => (
               <div key={clusterIdx} className="cluster-channel-select">
@@ -223,6 +319,7 @@ const ClusterView = ({ selectedDataset }) => {
             style={{ width: '100%', height: '100%' }}
             onHover={handlePointHover}
             onUnhover={handlePointUnhover}
+            onClick={handlePointClick}
           />
         </div>
 
@@ -232,6 +329,8 @@ const ClusterView = ({ selectedDataset }) => {
               <h3>Spike Preview</h3>
               <p>Cluster {hoveredPoint.cluster + 1} - Point {hoveredPoint.index + 1}</p>
               <p>Channel: {selectedChannels[hoveredPoint.cluster]}</p>
+              {spikePreview && <p>Time: {spikePreview.spikeTime} samples</p>}
+              <p className="click-hint">Click to navigate to spike</p>
             </div>
             {isLoadingPreview ? (
               <div className="preview-loading">Loading...</div>

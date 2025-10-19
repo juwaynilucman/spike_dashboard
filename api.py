@@ -21,7 +21,7 @@ os.makedirs(LABELS_FOLDER, exist_ok=True)
 
 data_array = None
 nrows = 385
-current_dataset = 'subset_5pct.bin'
+current_dataset = 'c46_data_5percent.pt'
 spike_times_data = None
 dataset_label_mapping = {}
 
@@ -918,6 +918,7 @@ def get_spike_preview():
         spike_index = data.get('spikeIndex', 0)
         channel_id = data.get('channelId', 1)
         window = data.get('window', 10)
+        filter_type = data.get('filterType', 'highpass')
         
         if spike_times_data is None:
             return jsonify({'error': 'No spike times data loaded'}), 400
@@ -946,30 +947,35 @@ def get_spike_preview():
         if array_index >= data_array.shape[0] or array_index < 0:
             return jsonify({'error': 'Invalid channel'}), 400
         
+        # Get full channel data for filtering
+        channel_data = data_array[array_index, :]
+        
+        # Apply selected filter to the entire channel (for proper filter behavior)
+        if filter_type != 'none':
+            try:
+                filtered_channel = apply_filter(channel_data.astype(float), filter_type=filter_type)
+            except:
+                print(f"Warning: Filter failed, using raw data")
+                filtered_channel = channel_data
+        else:
+            filtered_channel = channel_data
+        
         # Extract waveform with window around spike time
         start_idx = max(0, spike_time - window)
-        end_idx = min(data_array.shape[1], spike_time + window + 1)
+        end_idx = min(len(filtered_channel), spike_time + window + 1)
         
-        waveform = data_array[array_index, start_idx:end_idx]
+        waveform = filtered_channel[start_idx:end_idx]
         
-        # Apply high-pass filter to the waveform for cleaner visualization
-        if len(waveform) > 20:  # Only filter if we have enough points
-            try:
-                from scipy.signal import butter, filtfilt
-                nyquist = 30000 / 2.0
-                normalized_cutoff = 300 / nyquist
-                b, a = butter(4, normalized_cutoff, btype='high', analog=False)
-                waveform_filtered = filtfilt(b, a, waveform.astype(float))
-                waveform = np.round(waveform_filtered).astype(int)
-            except:
-                pass  # Use raw data if filtering fails
+        # Round to integer for display
+        waveform = np.round(waveform).astype(int)
         
         return jsonify({
             'waveform': waveform.tolist(),
             'spikeIndex': spike_index,
             'spikeTime': spike_time,
             'channelId': channel_id,
-            'window': window
+            'window': window,
+            'filterType': filter_type
         })
         
     except Exception as e:

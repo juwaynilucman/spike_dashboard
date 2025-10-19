@@ -8,7 +8,7 @@ import ConfirmDialog from './components/ConfirmDialog';
 import './App.css';
 
 function App() {
-  const [selectedChannels, setSelectedChannels] = useState([1, 2, 3]);
+  const [selectedChannels, setSelectedChannels] = useState([179, 181, 183]);
   const [channelScrollOffset, setChannelScrollOffset] = useState(0);
   const [spikeData, setSpikeData] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -18,7 +18,7 @@ function App() {
   const [invertData, setInvertData] = useState(false);
   const [datasetInfo, setDatasetInfo] = useState({ totalDataPoints: 3500000, totalChannels: 385 });
   const [datasets, setDatasets] = useState([]);
-  const [currentDataset, setCurrentDataset] = useState(null);
+  const [currentDataset, setCurrentDataset] = useState('c46_data_5percent.pt');
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [usePrecomputedSpikes, setUsePrecomputedSpikes] = useState(false);
@@ -31,8 +31,8 @@ function App() {
 
   useEffect(() => {
     fetchDatasets();
-    fetchDatasetInfo();
-    checkSpikeTimesAvailable();
+    // Load c46 dataset by default on initial mount
+    handleDatasetChange('c46_data_5percent.pt');
   }, []);
 
   useEffect(() => {
@@ -134,6 +134,12 @@ function App() {
           totalChannels: result.totalChannels,
           totalDataPoints: result.totalDataPoints
         });
+        
+        // Set default channels for c46 dataset
+        if (datasetName === 'c46_data_5percent.pt') {
+          setSelectedChannels([179, 181, 183]);
+        }
+        
         setTimeout(() => {
           checkSpikeTimesAvailable();
         }, 500);
@@ -284,6 +290,35 @@ function App() {
     }
   };
 
+  const handleNavigateToSpike = async (spikeTime, channelId, allClusterChannels = null) => {
+    try {
+      // Switch to spikes view
+      setSelectedDataType('spikes');
+      
+      // Enable precomputed spikes
+      setUsePrecomputedSpikes(true);
+      
+      // Set all 3 cluster channels as selected (deselect others)
+      if (allClusterChannels) {
+        setSelectedChannels(allClusterChannels);
+      } else {
+        setSelectedChannels([channelId]);
+      }
+      
+      // Center the view on the spike time
+      const halfWindow = Math.floor(windowSize / 2);
+      const newStart = Math.max(0, spikeTime - halfWindow);
+      const newEnd = Math.min(datasetInfo.totalDataPoints, spikeTime + halfWindow);
+      
+      setTimeRange({ start: newStart, end: newEnd });
+      
+      console.log(`Navigating to spike at time ${spikeTime} on channel ${channelId}, selected channels: ${allClusterChannels || [channelId]}`);
+      
+    } catch (error) {
+      console.error('Error navigating to spike:', error);
+    }
+  };
+
   const handleSpikeNavigation = async (direction) => {
     if (!usePrecomputedSpikes) return;
 
@@ -342,7 +377,10 @@ function App() {
           onDataTypeChange={setSelectedDataType}
         />
         {selectedDataType === 'clusters' ? (
-          <ClusterView selectedDataset={currentDataset} />
+          <ClusterView 
+            selectedDataset={currentDataset}
+            onNavigateToSpike={handleNavigateToSpike}
+          />
         ) : (
           <VisualizationArea
             spikeData={spikeData}

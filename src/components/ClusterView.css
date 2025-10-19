@@ -31,6 +31,41 @@
   display: flex;
   gap: 2rem;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-selector label {
+  color: rgba(224, 230, 237, 0.7);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.filter-select {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  border-radius: 6px;
+  color: #e0e6ed;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  min-width: 180px;
+  cursor: pointer;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #40e0d0;
+  box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
+}
+
+.filter-select option {
+  background: #1a1a2e;
+  color: #e0e6ed;
 }
 
 .channel-selectors {
@@ -123,6 +158,14 @@
   color: rgba(224, 230, 237, 0.8);
   font-size: 0.85rem;
   margin: 0.25rem 0;
+}
+
+.preview-info .click-hint {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: rgba(64, 224, 208, 0.7);
+  font-style: italic;
+  cursor: pointer;
 }
 
 .preview-loading {

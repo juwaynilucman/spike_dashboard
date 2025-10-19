@@ -5,7 +5,8 @@ const DataTypeSelector = ({ selectedDataType, onDataTypeChange }) => {
   const dataTypes = [
     { id: 'raw', label: 'Raw Data' },
     { id: 'filtered', label: 'Filtered Data' },
-    { id: 'spikes', label: 'Detected Spikes' }
+    { id: 'spikes', label: 'Detected Spikes' },
+    { id: 'clusters', label: 'Cluster View' }
   ];
 
   return (

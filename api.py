@@ -862,6 +862,122 @@ def format_file_size(size_bytes):
         size_bytes /= 1024.0
     return f"{size_bytes:.2f} PB"
 
+@app.route('/api/cluster-data', methods=['GET'])
+def get_cluster_data():
+    """Generate synthetic cluster data for visualization"""
+    try:
+        # Generate 3 clusters with 100 points each
+        np.random.seed(42)  # For reproducibility
+        
+        clusters = []
+        
+        # Cluster 1: centered around (2, 5)
+        cluster1_x = np.random.normal(2, 0.8, 100)
+        cluster1_y = np.random.normal(5, 0.8, 100)
+        clusters.append({
+            'points': [[float(x), float(y)] for x, y in zip(cluster1_x, cluster1_y)],
+            'center': [2.0, 5.0],
+            'color': '#FF6B6B'
+        })
+        
+        # Cluster 2: centered around (8, 2.5)
+        cluster2_x = np.random.normal(8, 0.9, 100)
+        cluster2_y = np.random.normal(2.5, 0.9, 100)
+        clusters.append({
+            'points': [[float(x), float(y)] for x, y in zip(cluster2_x, cluster2_y)],
+            'center': [8.0, 2.5],
+            'color': '#4ECDC4'
+        })
+        
+        # Cluster 3: centered around (4, 2)
+        cluster3_x = np.random.normal(4, 0.7, 100)
+        cluster3_y = np.random.normal(2, 0.7, 100)
+        clusters.append({
+            'points': [[float(x), float(y)] for x, y in zip(cluster3_x, cluster3_y)],
+            'center': [4.0, 2.0],
+            'color': '#95E1D3'
+        })
+        
+        return jsonify({
+            'clusters': clusters,
+            'numClusters': 3,
+            'pointsPerCluster': 100
+        })
+        
+    except Exception as e:
+        print(f"Error generating cluster data: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/spike-preview', methods=['POST'])
+def get_spike_preview():
+    """Get waveform preview for a specific spike"""
+    global spike_times_data, data_array
+    
+    try:
+        data = request.get_json()
+        spike_index = data.get('spikeIndex', 0)
+        channel_id = data.get('channelId', 1)
+        window = data.get('window', 10)
+        
+        if spike_times_data is None:
+            return jsonify({'error': 'No spike times data loaded'}), 400
+        
+        if data_array is None:
+            return jsonify({'error': 'No data loaded'}), 400
+        
+        # Get spike times (handle both global and channel-specific)
+        if isinstance(spike_times_data, np.ndarray):
+            # Global spike times
+            spike_times_list = spike_times_data.tolist() if hasattr(spike_times_data, 'tolist') else list(spike_times_data)
+        elif isinstance(spike_times_data, dict):
+            # Channel-specific spike times
+            spike_times_list = spike_times_data.get(channel_id, spike_times_data.get(str(channel_id), []))
+            if hasattr(spike_times_list, 'tolist'):
+                spike_times_list = spike_times_list.tolist()
+        else:
+            spike_times_list = []
+        
+        if not spike_times_list or spike_index >= len(spike_times_list):
+            return jsonify({'error': 'Invalid spike index'}), 400
+        
+        spike_time = int(spike_times_list[spike_index])
+        array_index = channel_id - 1
+        
+        if array_index >= data_array.shape[0] or array_index < 0:
+            return jsonify({'error': 'Invalid channel'}), 400
+        
+        # Extract waveform with window around spike time
+        start_idx = max(0, spike_time - window)
+        end_idx = min(data_array.shape[1], spike_time + window + 1)
+        
+        waveform = data_array[array_index, start_idx:end_idx]
+        
+        # Apply high-pass filter to the waveform for cleaner visualization
+        if len(waveform) > 20:  # Only filter if we have enough points
+            try:
+                from scipy.signal import butter, filtfilt
+                nyquist = 30000 / 2.0
+                normalized_cutoff = 300 / nyquist
+                b, a = butter(4, normalized_cutoff, btype='high', analog=False)
+                waveform_filtered = filtfilt(b, a, waveform.astype(float))
+                waveform = np.round(waveform_filtered).astype(int)
+            except:
+                pass  # Use raw data if filtering fails
+        
+        return jsonify({
+            'waveform': waveform.tolist(),
+            'spikeIndex': spike_index,
+            'spikeTime': spike_time,
+            'channelId': channel_id,
+            'window': window
+        })
+        
+    except Exception as e:
+        print(f"Error getting spike preview: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     print("=" * 60)
     print("Starting Spike Visualizer API...")

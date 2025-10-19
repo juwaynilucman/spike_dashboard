@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import VisualizationArea from './components/VisualizationArea';
+import ClusterView from './components/ClusterView';
 import Upload from './components/Upload';
 import ConfirmDialog from './components/ConfirmDialog';
 import './App.css';
@@ -340,31 +341,35 @@ function App() {
           selectedDataType={selectedDataType}
           onDataTypeChange={setSelectedDataType}
         />
-        <VisualizationArea
-          spikeData={spikeData}
-          selectedChannels={selectedChannels}
-          channelScrollOffset={channelScrollOffset}
-          timeRange={timeRange}
-          windowSize={windowSize}
-          spikeThreshold={spikeThreshold}
-          invertData={invertData}
-          totalDataPoints={datasetInfo.totalDataPoints}
-          onTimeRangeChange={setTimeRange}
-          onWindowSizeChange={handleWindowSizeChange}
-          onChannelScroll={handleChannelScroll}
-          onSpikeThresholdChange={setSpikeThreshold}
-          onInvertDataChange={handleInvertDataChange}
-          isLoading={isLoading}
-          usePrecomputedSpikes={usePrecomputedSpikes}
-          onUsePrecomputedChange={setUsePrecomputedSpikes}
-          precomputedAvailable={precomputedAvailable}
-          selectedDataType={selectedDataType}
-          filterType={filterType}
-          onFilterTypeChange={setFilterType}
-          filteredLineColor={filteredLineColor}
-          onFilteredLineColorChange={setFilteredLineColor}
-          onSpikeNavigation={handleSpikeNavigation}
-        />
+        {selectedDataType === 'clusters' ? (
+          <ClusterView selectedDataset={currentDataset} />
+        ) : (
+          <VisualizationArea
+            spikeData={spikeData}
+            selectedChannels={selectedChannels}
+            channelScrollOffset={channelScrollOffset}
+            timeRange={timeRange}
+            windowSize={windowSize}
+            spikeThreshold={spikeThreshold}
+            invertData={invertData}
+            totalDataPoints={datasetInfo.totalDataPoints}
+            onTimeRangeChange={setTimeRange}
+            onWindowSizeChange={handleWindowSizeChange}
+            onChannelScroll={handleChannelScroll}
+            onSpikeThresholdChange={setSpikeThreshold}
+            onInvertDataChange={handleInvertDataChange}
+            isLoading={isLoading}
+            usePrecomputedSpikes={usePrecomputedSpikes}
+            onUsePrecomputedChange={setUsePrecomputedSpikes}
+            precomputedAvailable={precomputedAvailable}
+            selectedDataType={selectedDataType}
+            filterType={filterType}
+            onFilterTypeChange={setFilterType}
+            filteredLineColor={filteredLineColor}
+            onFilteredLineColorChange={setFilteredLineColor}
+            onSpikeNavigation={handleSpikeNavigation}
+          />
+        )}
       </div>
       {showUploadModal && (
         <Upload 

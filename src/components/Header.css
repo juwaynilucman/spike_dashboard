@@ -52,3 +52,44 @@
   box-shadow: 0 2px 8px rgba(64, 224, 208, 0.4);
 }
 
+.view-selector-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.view-selector-container label {
+  color: rgba(224, 230, 237, 0.9);
+  font-size: 0.9rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.view-selector {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(64, 224, 208, 0.3);
+  border-radius: 6px;
+  color: #e0e6ed;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  min-width: 150px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-selector:hover {
+  border-color: rgba(64, 224, 208, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.view-selector:focus {
+  outline: none;
+  border-color: #40e0d0;
+  box-shadow: 0 0 0 2px rgba(64, 224, 208, 0.2);
+}
+
+.view-selector option {
+  background: #1a1a2e;
+  color: #e0e6ed;
+}
+

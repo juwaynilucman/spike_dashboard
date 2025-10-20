@@ -9,13 +9,30 @@ const Header = ({
   currentDataset, 
   onDatasetChange, 
   onUploadClick,
-  onDatasetDelete 
+  onDatasetDelete,
+  selectedView,
+  onViewChange
 }) => {
   return (
     <div className="header">
       <h1>Spike Visualization Dashboard</h1>
       
       <div className="header-controls">
+        <div className="view-selector-container">
+          <label htmlFor="view-select">View:</label>
+          <select 
+            id="view-select"
+            className="view-selector"
+            value={selectedView}
+            onChange={(e) => onViewChange(e.target.value)}
+          >
+            <option value="raw">Raw Data</option>
+            <option value="filtered">Filtered Data</option>
+            <option value="spikes">Detected Spikes</option>
+            <option value="clusters">Cluster View</option>
+          </select>
+        </div>
+
         <DatasetSelector
           datasets={datasets}
           currentDataset={currentDataset}

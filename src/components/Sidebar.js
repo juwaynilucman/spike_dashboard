@@ -1,9 +1,8 @@
 import React from 'react';
 import ChannelGrid from './ChannelGrid';
-import DataTypeSelector from './DataTypeSelector';
 import './Sidebar.css';
 
-const Sidebar = ({ selectedChannels, onChannelToggle, selectedDataType, onDataTypeChange }) => {
+const Sidebar = ({ selectedChannels, onChannelToggle }) => {
   return (
     <div className="sidebar">
       <div className="control-group">
@@ -12,12 +11,6 @@ const Sidebar = ({ selectedChannels, onChannelToggle, selectedDataType, onDataTy
           selectedChannels={selectedChannels}
           onChannelToggle={onChannelToggle}
           totalChannels={385}
-        />
-      </div>
-      <div className="data-type-group">
-        <DataTypeSelector
-          selectedDataType={selectedDataType}
-          onDataTypeChange={onDataTypeChange}
         />
       </div>
     </div>

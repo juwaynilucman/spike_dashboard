@@ -9,6 +9,10 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const [selectedChannels, setSelectedChannels] = useState({ 0: 179, 1: 181, 2: 183 });
   const [filterType, setFilterType] = useState('highpass');
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [overlaySpikes, setOverlaySpikes] = useState([]);
+  const [isLoadingOverlay, setIsLoadingOverlay] = useState(false);
+  const clickTimeoutRef = useRef(null);
+  const lastClickRef = useRef(null);
 
   useEffect(() => {
     fetchClusterData();
@@ -18,6 +22,15 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
       setSelectedChannels({ 0: 179, 1: 181, 2: 183 });
     }
   }, [selectedDataset]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Re-fetch spike preview when filter type changes
   useEffect(() => {
@@ -73,8 +86,8 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const handlePointHover = (event) => {
     if (event.points && event.points.length > 0) {
       const point = event.points[0];
-      const clusterIndex = point.curveNumber;
-      const pointIndex = point.pointIndex;
+      const clusterIndex = point.customdata.clusterIdx;
+      const pointIndex = point.customdata.pointIdx;
       
       setHoveredPoint({
         cluster: clusterIndex,
@@ -95,12 +108,100 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const handlePointClick = (event) => {
     if (event.points && event.points.length > 0) {
       const point = event.points[0];
-      const clusterIndex = point.curveNumber;
-      const pointIndex = point.pointIndex;
+      const clusterIndex = point.customdata.clusterIdx;
+      const pointIndex = point.customdata.pointIdx;
       const channelId = selectedChannels[clusterIndex];
       
-      // Fetch spike preview to get the spike time
-      fetchSpikePreviewForNavigation(clusterIndex, pointIndex, channelId);
+      // Detect double-click by checking if this is a second click within 300ms
+      const now = Date.now();
+      const lastClick = lastClickRef.current;
+      
+      if (lastClick && 
+          lastClick.clusterIndex === clusterIndex && 
+          lastClick.pointIndex === pointIndex &&
+          now - lastClick.time < 300) {
+        // Double click detected
+        if (clickTimeoutRef.current) {
+          clearTimeout(clickTimeoutRef.current);
+          clickTimeoutRef.current = null;
+        }
+        lastClickRef.current = null;
+        
+        // Navigate to spike in spike detection view
+        fetchSpikePreviewForNavigation(clusterIndex, pointIndex, channelId);
+      } else {
+        // First click - wait to see if there's a second click
+        lastClickRef.current = { clusterIndex, pointIndex, time: now };
+        
+        // Clear any existing timeout
+        if (clickTimeoutRef.current) {
+          clearTimeout(clickTimeoutRef.current);
+        }
+        
+        // Set timeout for single click action
+        clickTimeoutRef.current = setTimeout(() => {
+          // Single click: Add spike to overlay
+          addSpikeToOverlay(clusterIndex, pointIndex, channelId);
+          lastClickRef.current = null;
+          clickTimeoutRef.current = null;
+        }, 300);
+      }
+    }
+  };
+
+  const addSpikeToOverlay = async (clusterIndex, pointIndex, channelId) => {
+    setIsLoadingOverlay(true);
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      
+      const response = await fetch(`${apiUrl}/api/spike-preview`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          spikeIndex: pointIndex,
+          channelId: channelId,
+          window: 10,
+          filterType: filterType
+        })
+      });
+      
+      if (response.ok) {
+        const preview = await response.json();
+        
+        // Check if this spike is already in the overlay
+        const isDuplicate = overlaySpikes.some(
+          s => s.spikeIndex === pointIndex && s.channelId === channelId
+        );
+        
+        if (!isDuplicate) {
+          setOverlaySpikes(prev => [...prev, {
+            ...preview,
+            clusterIndex: clusterIndex,
+            color: ['#FF6B6B', '#4ECDC4', '#FFD700'][clusterIndex]
+          }]);
+        }
+      }
+    } catch (error) {
+      console.error('Error adding spike to overlay:', error);
+    } finally {
+      setIsLoadingOverlay(false);
+    }
+  };
+
+  const removeSpikeFromOverlay = (index) => {
+    setOverlaySpikes(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearOverlay = () => {
+    setOverlaySpikes([]);
+  };
+
+  const handleNavigateToSpikeFromOverlay = (spike) => {
+    if (onNavigateToSpike) {
+      const allClusterChannels = [selectedChannels[0], selectedChannels[1], selectedChannels[2]];
+      onNavigateToSpike(spike.spikeTime, spike.channelId, allClusterChannels);
     }
   };
 
@@ -137,26 +238,87 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const generatePlotData = () => {
     if (!clusterData) return [];
 
-    const colors = ['#FF6B6B', '#4ECDC4', '#95E1D3'];
+    const colors = ['#FF6B6B', '#4ECDC4', '#FFD700'];
     const clusterNames = ['Cluster 1', 'Cluster 2', 'Cluster 3'];
 
-    return clusterData.clusters.map((cluster, idx) => ({
-      x: cluster.points.map(p => p[0]),
-      y: cluster.points.map(p => p[1]),
-      mode: 'markers',
-      type: 'scatter',
-      name: clusterNames[idx],
-      marker: {
-        size: 10,
-        color: colors[idx],
-        opacity: 0.7,
-        line: {
-          color: colors[idx],
-          width: 2
+    const traces = [];
+
+    clusterData.clusters.forEach((cluster, clusterIdx) => {
+      // Create a set of selected point indices for this cluster
+      const selectedIndicesSet = new Set(
+        overlaySpikes
+          .filter(spike => spike.clusterIndex === clusterIdx)
+          .map(spike => spike.spikeIndex)
+      );
+
+      // Separate points into selected and unselected
+      const unselectedX = [];
+      const unselectedY = [];
+      const unselectedIndices = [];
+      const selectedX = [];
+      const selectedY = [];
+      const selectedPointIndices = [];
+
+      cluster.points.forEach((point, pointIdx) => {
+        if (selectedIndicesSet.has(pointIdx)) {
+          selectedX.push(point[0]);
+          selectedY.push(point[1]);
+          selectedPointIndices.push(pointIdx);
+        } else {
+          unselectedX.push(point[0]);
+          unselectedY.push(point[1]);
+          unselectedIndices.push(pointIdx);
         }
-      },
-      hovertemplate: `<b>${clusterNames[idx]}</b><br>Point: %{pointIndex}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>`
-    }));
+      });
+
+      // Add unselected points trace
+      if (unselectedX.length > 0) {
+        traces.push({
+          x: unselectedX,
+          y: unselectedY,
+          mode: 'markers',
+          type: 'scatter',
+          name: clusterNames[clusterIdx],
+          marker: {
+            size: 10,
+            color: colors[clusterIdx],
+            opacity: 0.7,
+            line: {
+              color: colors[clusterIdx],
+              width: 2
+            }
+          },
+          customdata: unselectedIndices.map(idx => ({ clusterIdx, pointIdx: idx })),
+          hovertemplate: `<b>${clusterNames[clusterIdx]}</b><br>Point: %{customdata.pointIdx}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>`,
+          showlegend: selectedX.length === 0 // Only show in legend if no selected points
+        });
+      }
+
+      // Add selected points trace with different styling
+      if (selectedX.length > 0) {
+        traces.push({
+          x: selectedX,
+          y: selectedY,
+          mode: 'markers',
+          type: 'scatter',
+          name: clusterNames[clusterIdx],
+          marker: {
+            size: 14,
+            color: colors[clusterIdx],
+            opacity: 1,
+            line: {
+              color: '#FFFFFF',
+              width: 3
+            },
+            symbol: 'circle'
+          },
+          customdata: selectedPointIndices.map(idx => ({ clusterIdx, pointIdx: idx })),
+          hovertemplate: `<b>${clusterNames[clusterIdx]} (Selected)</b><br>Point: %{customdata.pointIdx}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>`
+        });
+      }
+    });
+
+    return traces;
   };
 
   const generatePreviewPlot = () => {
@@ -233,6 +395,71 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
     };
   };
 
+  const generateOverlayPlot = () => {
+    if (overlaySpikes.length === 0) return null;
+
+    // Normalize all waveforms to start at time 0 (relative to spike)
+    const traces = overlaySpikes.map((spike, idx) => {
+      const window = spike.window || 10;
+      const relativeTimePoints = Array.from(
+        { length: spike.waveform.length },
+        (_, i) => i - window
+      );
+
+      return {
+        x: relativeTimePoints,
+        y: spike.waveform,
+        type: 'scatter',
+        mode: 'lines',
+        name: `Cluster ${spike.clusterIndex + 1} - CH${spike.channelId}`,
+        line: { color: spike.color, width: 2 },
+        hovertemplate: `<b>Cluster ${spike.clusterIndex + 1}</b><br>CH${spike.channelId} - Spike ${spike.spikeIndex}<br>Time: %{x}<br>Amplitude: %{y:.2f}<extra></extra>`
+      };
+    });
+
+    // Add a vertical line at spike time (time 0)
+    const allAmplitudes = overlaySpikes.flatMap(s => s.waveform);
+    traces.push({
+      x: [0, 0],
+      y: [Math.min(...allAmplitudes), Math.max(...allAmplitudes)],
+      type: 'scatter',
+      mode: 'lines',
+      line: { color: 'rgba(255, 255, 255, 0.3)', width: 2, dash: 'dash' },
+      hoverinfo: 'skip',
+      showlegend: false
+    });
+
+    return {
+      data: traces,
+      layout: {
+        autosize: true,
+        paper_bgcolor: 'rgba(26, 26, 46, 0.95)',
+        plot_bgcolor: 'rgba(0, 0, 0, 0.3)',
+        font: { color: '#e0e6ed', size: 11 },
+        xaxis: {
+          title: 'Time Relative to Spike (samples)',
+          gridcolor: 'rgba(64, 224, 208, 0.2)',
+          zerolinecolor: 'rgba(64, 224, 208, 0.4)',
+          color: '#e0e6ed'
+        },
+        yaxis: {
+          title: 'Amplitude',
+          gridcolor: 'rgba(64, 224, 208, 0.2)',
+          zerolinecolor: 'rgba(64, 224, 208, 0.4)',
+          color: '#e0e6ed'
+        },
+        hovermode: 'closest',
+        showlegend: false,
+        margin: { l: 60, r: 20, t: 20, b: 60 }
+      },
+      config: {
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d']
+      }
+    };
+  };
+
   const handleChannelChange = (clusterIndex, channelId) => {
     setSelectedChannels(prev => ({
       ...prev,
@@ -261,7 +488,7 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
           <div className="channel-selectors">
             {[0, 1, 2].map(clusterIdx => (
               <div key={clusterIdx} className="cluster-channel-select">
-                <label style={{ color: ['#FF6B6B', '#4ECDC4', '#95E1D3'][clusterIdx] }}>
+                <label style={{ color: ['#FF6B6B', '#4ECDC4', '#FFD700'][clusterIdx] }}>
                   Cluster {clusterIdx + 1} Channel:
                 </label>
                 <input
@@ -284,6 +511,7 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
             data={generatePlotData()}
             layout={{
               autosize: true,
+              uirevision: 'true',
               paper_bgcolor: 'rgba(30, 30, 60, 0.6)',
               plot_bgcolor: 'rgba(0, 0, 0, 0.3)',
               font: { color: '#e0e6ed' },
@@ -323,14 +551,76 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
           />
         </div>
 
+        {overlaySpikes.length > 0 && (
+          <div className="spike-overlay-container">
+            <div className="overlay-header">
+              <h3>Spike Overlay Comparison</h3>
+              <div className="overlay-controls">
+                <span className="spike-count">{overlaySpikes.length} spike{overlaySpikes.length !== 1 ? 's' : ''}</span>
+                <button className="clear-overlay-btn" onClick={clearOverlay}>
+                  Clear All
+                </button>
+              </div>
+            </div>
+            
+            <div className="overlay-plot">
+              {isLoadingOverlay ? (
+                <div className="overlay-loading">Loading spike...</div>
+              ) : (
+                <Plot
+                  data={generateOverlayPlot().data}
+                  layout={generateOverlayPlot().layout}
+                  config={generateOverlayPlot().config}
+                  style={{ width: '100%', height: '100%' }}
+                />
+              )}
+            </div>
+            
+            <div className="overlay-spike-list-compact">
+              <h4>Selected Spikes:</h4>
+              <div className="spike-list-items-compact">
+                {overlaySpikes.map((spike, idx) => (
+                  <div key={idx} className="spike-list-item-compact" style={{ borderLeftColor: spike.color }}>
+                    <div className="spike-item-info-compact">
+                      <span className="spike-item-label-compact">
+                        Cluster {spike.clusterIndex + 1} - CH{spike.channelId}
+                      </span>
+                      <span className="spike-item-time-compact">
+                        Spike {spike.spikeIndex} (t={spike.spikeTime})
+                      </span>
+                    </div>
+                    <div className="spike-item-actions-compact">
+                      <button 
+                        className="spike-item-nav-btn-compact" 
+                        onClick={() => handleNavigateToSpikeFromOverlay(spike)}
+                        title="Navigate to spike"
+                      >
+                        →
+                      </button>
+                      <button 
+                        className="spike-item-remove-btn-compact" 
+                        onClick={() => removeSpikeFromOverlay(idx)}
+                        title="Remove from overlay"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {hoveredPoint && (
-          <div className="spike-preview-panel">
+          <div className={`spike-preview-panel ${overlaySpikes.length > 0 ? 'with-overlay' : ''}`}>
             <div className="preview-info">
               <h3>Spike Preview</h3>
               <p>Cluster {hoveredPoint.cluster + 1} - Point {hoveredPoint.index + 1}</p>
               <p>Channel: {selectedChannels[hoveredPoint.cluster]}</p>
               {spikePreview && <p>Time: {spikePreview.spikeTime} samples</p>}
-              <p className="click-hint">Click to navigate to spike</p>
+              <p className="click-hint">Click: Add to overlay</p>
+              <p className="click-hint">Double-click: Navigate to spike</p>
             </div>
             {isLoadingPreview ? (
               <div className="preview-loading">Loading...</div>

@@ -375,14 +375,16 @@ function App() {
         onDatasetChange={handleDatasetChange}
         onUploadClick={() => setShowUploadModal(true)}
         onDatasetDelete={handleDatasetDelete}
+        selectedView={selectedDataType}
+        onViewChange={setSelectedDataType}
       />
       <div className="main-container">
-        <Sidebar
-          selectedChannels={selectedChannels}
-          onChannelToggle={handleChannelToggle}
-          selectedDataType={selectedDataType}
-          onDataTypeChange={setSelectedDataType}
-        />
+        {selectedDataType !== 'clusters' && (
+          <Sidebar
+            selectedChannels={selectedChannels}
+            onChannelToggle={handleChannelToggle}
+          />
+        )}
         {selectedDataType === 'clusters' ? (
           <ClusterView 
             selectedDataset={currentDataset}

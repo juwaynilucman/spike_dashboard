@@ -15,13 +15,14 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
           name: 'Spike Data'
         }],
         layout: {
-          xaxis: { 
+          autosize: true,
+          xaxis: {
             title: 'Time (s)',
             color: '#e0e6ed',
             gridcolor: 'rgba(64, 224, 208, 0.2)',
             showgrid: true
           },
-          yaxis: { 
+          yaxis: {
             title: 'Amplitude',
             color: '#e0e6ed',
             gridcolor: 'rgba(64, 224, 208, 0.2)',
@@ -169,14 +170,15 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
     return {
       data: plotData,
       layout: {
-        xaxis: { 
+        autosize: true,
+        xaxis: {
           title: 'Time (s)',
           color: '#e0e6ed',
           gridcolor: 'rgba(64, 224, 208, 0.2)',
           showgrid: true,
           range: [timeRange.start, timeRange.end]
         },
-        yaxis: { 
+        yaxis: {
           title: 'Amplitude',
           color: '#e0e6ed',
           gridcolor: 'rgba(64, 224, 208, 0.2)',
@@ -210,6 +212,7 @@ const SpikeChannel = ({ channelId, data, isActive, timeRange, windowSize, spikeT
               layout={plotData.layout}
               config={plotData.config}
               style={{ width: '100%', height: '100%' }}
+              useResizeHandler={true}
             />
             {usePrecomputedSpikes && onSpikeNavigation && (
               <div className="spike-nav-arrows">

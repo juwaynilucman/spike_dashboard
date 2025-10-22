@@ -23,10 +23,11 @@ function App() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [usePrecomputedSpikes, setUsePrecomputedSpikes] = useState(false);
   const [precomputedAvailable, setPrecomputedAvailable] = useState(false);
+  const [selectedView, setSelectedView] = useState('signal'); // 'signal' or 'clusters'
   const [selectedDataType, setSelectedDataType] = useState('raw'); // 'raw', 'filtered', or 'spikes'
   const [filterType, setFilterType] = useState('highpass'); // 'none', 'highpass', 'lowpass', 'bandpass', 'bandstop'
   const [filteredLineColor, setFilteredLineColor] = useState('#FFD700'); // Color for filtered data line
-  
+
   const dataCache = React.useRef({});
 
   useEffect(() => {
@@ -299,28 +300,29 @@ function App() {
 
   const handleNavigateToSpike = async (spikeTime, channelId, allClusterChannels = null) => {
     try {
-      // Switch to spikes view
+      // Switch to signal view with spikes mode
+      setSelectedView('signal');
       setSelectedDataType('spikes');
-      
+
       // Enable precomputed spikes
       setUsePrecomputedSpikes(true);
-      
+
       // Set all 3 cluster channels as selected (deselect others)
       if (allClusterChannels) {
         setSelectedChannels(allClusterChannels);
       } else {
         setSelectedChannels([channelId]);
       }
-      
+
       // Center the view on the spike time
       const halfWindow = Math.floor(windowSize / 2);
       const newStart = Math.max(0, spikeTime - halfWindow);
       const newEnd = Math.min(datasetInfo.totalDataPoints, spikeTime + halfWindow);
-      
+
       setTimeRange({ start: newStart, end: newEnd });
-      
+
       console.log(`Navigating to spike at time ${spikeTime} on channel ${channelId}, selected channels: ${allClusterChannels || [channelId]}`);
-      
+
     } catch (error) {
       console.error('Error navigating to spike:', error);
     }
@@ -367,7 +369,7 @@ function App() {
 
   return (
     <div className="app">
-      <Header 
+      <Header
         totalChannels={datasetInfo.totalChannels}
         activeChannels={selectedChannels.length}
         datasets={datasets}
@@ -375,18 +377,20 @@ function App() {
         onDatasetChange={handleDatasetChange}
         onUploadClick={() => setShowUploadModal(true)}
         onDatasetDelete={handleDatasetDelete}
-        selectedView={selectedDataType}
-        onViewChange={setSelectedDataType}
+        selectedView={selectedView}
+        onViewChange={setSelectedView}
+        selectedSignalType={selectedDataType}
+        onSignalTypeChange={setSelectedDataType}
       />
       <div className="main-container">
-        {selectedDataType !== 'clusters' && (
+        {selectedView === 'signal' && (
           <Sidebar
             selectedChannels={selectedChannels}
             onChannelToggle={handleChannelToggle}
           />
         )}
-        {selectedDataType === 'clusters' ? (
-          <ClusterView 
+        {selectedView === 'clusters' ? (
+          <ClusterView
             selectedDataset={currentDataset}
             onNavigateToSpike={handleNavigateToSpike}
           />

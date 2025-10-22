@@ -2,36 +2,52 @@ import React from 'react';
 import DatasetSelector from './DatasetSelector';
 import './Header.css';
 
-const Header = ({ 
-  totalChannels, 
-  activeChannels, 
-  datasets, 
-  currentDataset, 
-  onDatasetChange, 
+const Header = ({
+  totalChannels,
+  activeChannels,
+  datasets,
+  currentDataset,
+  onDatasetChange,
   onUploadClick,
   onDatasetDelete,
   selectedView,
-  onViewChange
+  onViewChange,
+  selectedSignalType,
+  onSignalTypeChange
 }) => {
   return (
     <div className="header">
       <h1>Spike Visualization Dashboard</h1>
-      
+
       <div className="header-controls">
         <div className="view-selector-container">
           <label htmlFor="view-select">View:</label>
-          <select 
+          <select
             id="view-select"
             className="view-selector"
             value={selectedView}
             onChange={(e) => onViewChange(e.target.value)}
           >
-            <option value="raw">Raw Data</option>
-            <option value="filtered">Filtered Data</option>
-            <option value="spikes">Detected Spikes</option>
+            <option value="signal">Signal View</option>
             <option value="clusters">Cluster View</option>
           </select>
         </div>
+
+        {selectedView === 'signal' && (
+          <div className="view-selector-container">
+            <label htmlFor="signal-type-select">Signal Type:</label>
+            <select
+              id="signal-type-select"
+              className="view-selector"
+              value={selectedSignalType}
+              onChange={(e) => onSignalTypeChange(e.target.value)}
+            >
+              <option value="raw">Raw Data</option>
+              <option value="filtered">Filtered Data</option>
+              <option value="spikes">Detected Spikes</option>
+            </select>
+          </div>
+        )}
 
         <DatasetSelector
           datasets={datasets}

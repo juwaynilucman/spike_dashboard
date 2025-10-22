@@ -11,17 +11,20 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [overlaySpikes, setOverlaySpikes] = useState([]);
   const [isLoadingOverlay, setIsLoadingOverlay] = useState(false);
+  const [mode, setMode] = useState('synthetic'); // 'synthetic' or 'real'
+  const [channelMapping, setChannelMapping] = useState({}); // clusterId -> channelId mapping
+  const [showChannelMappingModal, setShowChannelMappingModal] = useState(false);
   const clickTimeoutRef = useRef(null);
   const lastClickRef = useRef(null);
 
   useEffect(() => {
     fetchClusterData();
-    
+
     // Reset channels to default for c46 dataset
     if (selectedDataset === 'c46') {
       setSelectedChannels({ 0: 179, 1: 181, 2: 183 });
     }
-  }, [selectedDataset]);
+  }, [selectedDataset, mode, channelMapping]);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -42,11 +45,39 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const fetchClusterData = async () => {
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const response = await fetch(`${apiUrl}/api/cluster-data`);
-      
+
+      let requestBody;
+      if (mode === 'real') {
+        // For real data, send mode and channel mapping
+        requestBody = {
+          mode: 'real',
+          channelMapping: channelMapping
+        };
+      } else {
+        // For synthetic data, send channel IDs
+        const channelIds = [
+          selectedChannels[0],
+          selectedChannels[1],
+          selectedChannels[2]
+        ];
+        requestBody = {
+          mode: 'synthetic',
+          channelIds: channelIds
+        };
+      }
+
+      const response = await fetch(`${apiUrl}/api/cluster-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
+      });
+
       if (response.ok) {
         const data = await response.json();
         setClusterData(data);
+        console.log('Cluster data loaded:', data);
       }
     } catch (error) {
       console.error('Error fetching cluster data:', error);
@@ -57,7 +88,30 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
     setIsLoadingPreview(true);
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const channelId = selectedChannels[clusterIndex];
+
+      // Get cluster and channel info
+      if (!clusterData || !clusterData.clusters || !clusterData.clusters[clusterIndex]) {
+        console.error('Cluster data not available');
+        setIsLoadingPreview(false);
+        return;
+      }
+
+      const cluster = clusterData.clusters[clusterIndex];
+      const spikeTime = cluster.spikeTimes[pointIndex];
+
+      if (spikeTime === null || spikeTime === undefined) {
+        console.error('No spike time available for this point');
+        setIsLoadingPreview(false);
+        return;
+      }
+
+      // Get channel ID based on mode
+      let channelId;
+      if (mode === 'real') {
+        channelId = cluster.channelId || channelMapping[cluster.clusterId] || 181;
+      } else {
+        channelId = selectedChannels[clusterIndex];
+      }
       
       const response = await fetch(`${apiUrl}/api/spike-preview`, {
         method: 'POST',
@@ -65,10 +119,11 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          spikeIndex: pointIndex,
+          spikeTime: spikeTime,
           channelId: channelId,
           window: 10,
-          filterType: filterType
+          filterType: filterType,
+          pointIndex: pointIndex
         })
       });
       
@@ -154,16 +209,33 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       
+      // Get spike time from cluster data
+      if (!clusterData || !clusterData.clusters || !clusterData.clusters[clusterIndex]) {
+        console.error('Cluster data not available');
+        setIsLoadingOverlay(false);
+        return;
+      }
+      
+      const cluster = clusterData.clusters[clusterIndex];
+      const spikeTime = cluster.spikeTimes[pointIndex];
+      
+      if (spikeTime === null || spikeTime === undefined) {
+        console.error('No spike time available for this point');
+        setIsLoadingOverlay(false);
+        return;
+      }
+      
       const response = await fetch(`${apiUrl}/api/spike-preview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          spikeIndex: pointIndex,
+          spikeTime: spikeTime,
           channelId: channelId,
           window: 10,
-          filterType: filterType
+          filterType: filterType,
+          pointIndex: pointIndex
         })
       });
       
@@ -172,13 +244,14 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
         
         // Check if this spike is already in the overlay
         const isDuplicate = overlaySpikes.some(
-          s => s.spikeIndex === pointIndex && s.channelId === channelId
+          s => s.spikeTime === spikeTime && s.channelId === channelId
         );
         
         if (!isDuplicate) {
           setOverlaySpikes(prev => [...prev, {
             ...preview,
             clusterIndex: clusterIndex,
+            pointIndex: pointIndex,
             color: ['#FF6B6B', '#4ECDC4', '#FFD700'][clusterIndex]
           }]);
         }
@@ -209,16 +282,31 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       
+      // Get spike time from cluster data
+      if (!clusterData || !clusterData.clusters || !clusterData.clusters[clusterIndex]) {
+        console.error('Cluster data not available');
+        return;
+      }
+      
+      const cluster = clusterData.clusters[clusterIndex];
+      const spikeTime = cluster.spikeTimes[pointIndex];
+      
+      if (spikeTime === null || spikeTime === undefined) {
+        console.error('No spike time available for this point');
+        return;
+      }
+      
       const response = await fetch(`${apiUrl}/api/spike-preview`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          spikeIndex: pointIndex,
+          spikeTime: spikeTime,
           channelId: channelId,
           window: 10,
-          filterType: filterType
+          filterType: filterType,
+          pointIndex: pointIndex
         })
       });
       
@@ -238,17 +326,22 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
   const generatePlotData = () => {
     if (!clusterData) return [];
 
-    const colors = ['#FF6B6B', '#4ECDC4', '#FFD700'];
-    const clusterNames = ['Cluster 1', 'Cluster 2', 'Cluster 3'];
-
     const traces = [];
+    const totalClusters = clusterData.numClusters || clusterData.clusters.length;
+    const totalPoints = clusterData.totalPoints || 0;
+
+    // Calculate dynamic point size based on total points
+    let basePointSize = 10;
+    if (totalPoints > 10000) basePointSize = 4;
+    else if (totalPoints > 5000) basePointSize = 6;
+    else if (totalPoints > 1000) basePointSize = 8;
 
     clusterData.clusters.forEach((cluster, clusterIdx) => {
       // Create a set of selected point indices for this cluster
       const selectedIndicesSet = new Set(
         overlaySpikes
           .filter(spike => spike.clusterIndex === clusterIdx)
-          .map(spike => spike.spikeIndex)
+          .map(spike => spike.pointIndex)
       );
 
       // Separate points into selected and unselected
@@ -271,25 +364,28 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
         }
       });
 
+      const color = cluster.color || `hsl(${(clusterIdx * 360) / totalClusters}, 70%, 60%)`;
+      const clusterName = mode === 'real' ? `Cluster ${cluster.clusterId}` : `Cluster ${clusterIdx + 1}`;
+
       // Add unselected points trace
       if (unselectedX.length > 0) {
         traces.push({
           x: unselectedX,
           y: unselectedY,
           mode: 'markers',
-          type: 'scatter',
-          name: clusterNames[clusterIdx],
+          type: 'scattergl', // Use WebGL for better performance
+          name: clusterName,
           marker: {
-            size: 10,
-            color: colors[clusterIdx],
+            size: basePointSize,
+            color: color,
             opacity: 0.7,
             line: {
-              color: colors[clusterIdx],
-              width: 2
+              color: color,
+              width: 1
             }
           },
-          customdata: unselectedIndices.map(idx => ({ clusterIdx, pointIdx: idx })),
-          hovertemplate: `<b>${clusterNames[clusterIdx]}</b><br>Point: %{customdata.pointIdx}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>`,
+          customdata: unselectedIndices.map(idx => ({ clusterIdx, pointIdx: idx, clusterId: cluster.clusterId })),
+          hovertemplate: `<b>${clusterName}</b><br>Point: %{customdata.pointIdx}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>`,
           showlegend: selectedX.length === 0 // Only show in legend if no selected points
         });
       }
@@ -300,20 +396,20 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
           x: selectedX,
           y: selectedY,
           mode: 'markers',
-          type: 'scatter',
-          name: clusterNames[clusterIdx],
+          type: 'scattergl', // Use WebGL for better performance
+          name: clusterName,
           marker: {
-            size: 14,
-            color: colors[clusterIdx],
+            size: basePointSize + 4,
+            color: color,
             opacity: 1,
             line: {
               color: '#FFFFFF',
-              width: 3
+              width: 2
             },
             symbol: 'circle'
           },
-          customdata: selectedPointIndices.map(idx => ({ clusterIdx, pointIdx: idx })),
-          hovertemplate: `<b>${clusterNames[clusterIdx]} (Selected)</b><br>Point: %{customdata.pointIdx}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>`
+          customdata: selectedPointIndices.map(idx => ({ clusterIdx, pointIdx: idx, clusterId: cluster.clusterId })),
+          hovertemplate: `<b>${clusterName} (Selected)</b><br>Point: %{customdata.pointIdx}<br>PC1: %{x:.2f}<br>PC2: %{y:.2f}<extra></extra>`
         });
       }
     });
@@ -376,7 +472,7 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
           color: '#e0e6ed'
         },
         title: {
-          text: `CH${spikePreview.channelId} - Spike ${spikePreview.spikeIndex}`,
+          text: `CH${spikePreview.channelId} - Point ${spikePreview.pointIndex}`,
           font: { size: 12, color: '#40e0d0' }
         },
         annotations: [{
@@ -413,7 +509,7 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
         mode: 'lines',
         name: `Cluster ${spike.clusterIndex + 1} - CH${spike.channelId}`,
         line: { color: spike.color, width: 2 },
-        hovertemplate: `<b>Cluster ${spike.clusterIndex + 1}</b><br>CH${spike.channelId} - Spike ${spike.spikeIndex}<br>Time: %{x}<br>Amplitude: %{y:.2f}<extra></extra>`
+        hovertemplate: `<b>Cluster ${spike.clusterIndex + 1}</b><br>CH${spike.channelId} - Point ${spike.pointIndex}<br>Time: %{x}<br>Amplitude: %{y:.2f}<extra></extra>`
       };
     });
 
@@ -467,15 +563,44 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
     }));
   };
 
+  const handleModeChange = (newMode) => {
+    setMode(newMode);
+    setOverlaySpikes([]); // Clear overlay when switching modes
+  };
+
+  const handleChannelMappingChange = (clusterId, channelId) => {
+    setChannelMapping(prev => ({
+      ...prev,
+      [clusterId]: parseInt(channelId) || null
+    }));
+  };
+
+  const applyChannelMappings = () => {
+    setShowChannelMappingModal(false);
+    // Trigger re-fetch with new mappings
+    fetchClusterData();
+  };
+
   return (
     <div className="cluster-view">
       <div className="cluster-header">
         <h2>Spike Cluster Visualization</h2>
         <div className="cluster-controls">
           <div className="filter-selector">
+            <label>Mode:</label>
+            <select
+              className="filter-select"
+              value={mode}
+              onChange={(e) => handleModeChange(e.target.value)}
+            >
+              <option value="synthetic">Synthetic (Demo)</option>
+              <option value="real">Real Data</option>
+            </select>
+          </div>
+          <div className="filter-selector">
             <label>Filter Type:</label>
-            <select 
-              className="filter-select" 
+            <select
+              className="filter-select"
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
             >
@@ -485,23 +610,33 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
               <option value="bandpass">Band-pass (300-3000 Hz)</option>
             </select>
           </div>
-          <div className="channel-selectors">
-            {[0, 1, 2].map(clusterIdx => (
-              <div key={clusterIdx} className="cluster-channel-select">
-                <label style={{ color: ['#FF6B6B', '#4ECDC4', '#FFD700'][clusterIdx] }}>
-                  Cluster {clusterIdx + 1} Channel:
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="385"
-                  value={selectedChannels[clusterIdx]}
-                  onChange={(e) => handleChannelChange(clusterIdx, e.target.value)}
-                  className="channel-input"
-                />
-              </div>
-            ))}
-          </div>
+          {mode === 'synthetic' && (
+            <div className="channel-selectors">
+              {[0, 1, 2].map(clusterIdx => (
+                <div key={clusterIdx} className="cluster-channel-select">
+                  <label style={{ color: ['#FF6B6B', '#4ECDC4', '#FFD700'][clusterIdx] }}>
+                    Cluster {clusterIdx + 1} Channel:
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="385"
+                    value={selectedChannels[clusterIdx]}
+                    onChange={(e) => handleChannelChange(clusterIdx, e.target.value)}
+                    className="channel-input"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          {mode === 'real' && (
+            <button
+              className="channel-mapping-btn"
+              onClick={() => setShowChannelMappingModal(true)}
+            >
+              Configure Channel Mapping
+            </button>
+          )}
         </div>
       </div>
 
@@ -586,7 +721,7 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
                         Cluster {spike.clusterIndex + 1} - CH{spike.channelId}
                       </span>
                       <span className="spike-item-time-compact">
-                        Spike {spike.spikeIndex} (t={spike.spikeTime})
+                        Point {spike.pointIndex} (t={spike.spikeTime})
                       </span>
                     </div>
                     <div className="spike-item-actions-compact">
@@ -636,6 +771,57 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
           </div>
         )}
       </div>
+
+      {/* Channel Mapping Modal for Real Data */}
+      {showChannelMappingModal && mode === 'real' && clusterData && (
+        <div className="channel-mapping-modal-overlay" onClick={() => setShowChannelMappingModal(false)}>
+          <div className="channel-mapping-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Channel Mapping Configuration</h3>
+              <button className="modal-close" onClick={() => setShowChannelMappingModal(false)}>×</button>
+            </div>
+            <div className="modal-info">
+              <p>Assign neural channels to each cluster for spike preview and navigation.</p>
+              <p className="modal-hint">{clusterData.numClusters} clusters found • Leave blank to use default channel 181</p>
+            </div>
+            <div className="channel-mapping-list">
+              {clusterData.clusterIds && clusterData.clusterIds.map((clusterId) => {
+                const cluster = clusterData.clusters.find(c => c.clusterId === clusterId);
+                const color = cluster ? cluster.color : '#888';
+                return (
+                  <div key={clusterId} className="channel-mapping-item">
+                    <div className="cluster-info">
+                      <div className="cluster-color-indicator" style={{ backgroundColor: color }}></div>
+                      <span className="cluster-label">Cluster {clusterId}</span>
+                      <span className="cluster-point-count">({cluster ? cluster.pointCount : 0} points)</span>
+                    </div>
+                    <div className="channel-input-container">
+                      <label>Channel:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="385"
+                        placeholder="181"
+                        value={channelMapping[clusterId] || ''}
+                        onChange={(e) => handleChannelMappingChange(clusterId, e.target.value)}
+                        className="channel-input-modal"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="modal-footer">
+              <button className="modal-btn-secondary" onClick={() => setShowChannelMappingModal(false)}>
+                Cancel
+              </button>
+              <button className="modal-btn-primary" onClick={applyChannelMappings}>
+                Apply Mappings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

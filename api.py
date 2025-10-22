@@ -895,86 +895,172 @@ def format_file_size(size_bytes):
         size_bytes /= 1024.0
     return f"{size_bytes:.2f} PB"
 
-@app.route('/api/cluster-data', methods=['GET'])
+def generate_cluster_color(cluster_idx, total_clusters):
+    """Generate a color for a cluster using HSV color space for good distribution"""
+    import colorsys
+    
+    # Use golden ratio for better color distribution
+    golden_ratio = 0.618033988749895
+    hue = (cluster_idx * golden_ratio) % 1.0
+    
+    # Use high saturation and value for vibrant colors
+    saturation = 0.7 + (cluster_idx % 3) * 0.1  # Vary saturation slightly
+    value = 0.85 + (cluster_idx % 2) * 0.1  # Vary brightness slightly
+    
+    r, g, b = colorsys.hsv_to_rgb(hue, saturation, value)
+    
+    # Convert to hex
+    return f'#{int(r*255):02x}{int(g*255):02x}{int(b*255):02x}'
+
+@app.route('/api/cluster-data', methods=['POST'])
 def get_cluster_data():
-    """Generate synthetic cluster data for visualization"""
+    """Get cluster data for visualization - supports both synthetic and real data"""
+    global spike_times_data
+
     try:
-        # Generate 3 clusters with 100 points each
-        np.random.seed(42)  # For reproducibility
-        
-        clusters = []
-        
-        # Cluster 1: centered around (2, 5)
-        cluster1_x = np.random.normal(2, 0.8, 100)
-        cluster1_y = np.random.normal(5, 0.8, 100)
-        clusters.append({
-            'points': [[float(x), float(y)] for x, y in zip(cluster1_x, cluster1_y)],
-            'center': [2.0, 5.0],
-            'color': '#FF6B6B'
-        })
-        
-        # Cluster 2: centered around (8, 2.5)
-        cluster2_x = np.random.normal(8, 0.9, 100)
-        cluster2_y = np.random.normal(2.5, 0.9, 100)
-        clusters.append({
-            'points': [[float(x), float(y)] for x, y in zip(cluster2_x, cluster2_y)],
-            'center': [8.0, 2.5],
-            'color': '#4ECDC4'
-        })
-        
-        # Cluster 3: centered around (4, 2)
-        cluster3_x = np.random.normal(4, 0.7, 100)
-        cluster3_y = np.random.normal(2, 0.7, 100)
-        clusters.append({
-            'points': [[float(x), float(y)] for x, y in zip(cluster3_x, cluster3_y)],
-            'center': [4.0, 2.0],
-            'color': '#95E1D3'
-        })
-        
-        return jsonify({
-            'clusters': clusters,
-            'numClusters': 3,
-            'pointsPerCluster': 100
-        })
+        data = request.get_json()
+        mode = data.get('mode', 'synthetic')  # 'synthetic' or 'real'
+        channel_mapping = data.get('channelMapping', {})  # Dict of clusterId -> channelId
+
+        if mode == 'real':
+            # Load real cluster data from numpy file in labels folder
+            cluster_file = os.path.join(LABELS_FOLDER, 'spikes_xyclu_time.npy')
+
+            if not os.path.exists(cluster_file):
+                # Try alternate name
+                cluster_file = os.path.join(LABELS_FOLDER, 'spikes_xyclu_time 1.npy')
+                if not os.path.exists(cluster_file):
+                    return jsonify({'error': f'Cluster data file not found in labels folder'}), 404
+
+            print(f"Loading real cluster data from: {cluster_file}")
+            spikes_arr = np.load(cluster_file)
+
+            # Extract data
+            xy_coordinates = spikes_arr[:, :2]
+            cluster_ids = spikes_arr[:, 2].astype(np.int64)
+            times_secs = spikes_arr[:, 3]
+            sampling_frequency = 30000
+            times_indices = (times_secs * sampling_frequency).astype(np.int64)
+
+            # Get unique cluster IDs
+            unique_cluster_ids = np.unique(cluster_ids)
+            print(f"Found {len(unique_cluster_ids)} unique clusters with {len(cluster_ids)} total points")
+
+            clusters = []
+
+            for cluster_idx, cluster_id in enumerate(unique_cluster_ids):
+                # Get all points for this cluster
+                mask = cluster_ids == cluster_id
+                cluster_points = xy_coordinates[mask]
+                cluster_times = times_indices[mask]
+
+                # Generate color for this cluster
+                color = generate_cluster_color(cluster_idx, len(unique_cluster_ids))
+
+                # Get channel ID from mapping if provided, default to 181
+                channel_id = channel_mapping.get(str(int(cluster_id))) if channel_mapping else 181
+
+                clusters.append({
+                    'clusterId': int(cluster_id),
+                    'points': cluster_points.tolist(),
+                    'spikeTimes': cluster_times.tolist(),
+                    'color': color,
+                    'channelId': channel_id,
+                    'pointCount': len(cluster_points)
+                })
+
+            print(f"Prepared {len(clusters)} clusters for visualization")
+
+            return jsonify({
+                'mode': 'real',
+                'clusters': clusters,
+                'numClusters': len(clusters),
+                'totalPoints': len(cluster_ids),
+                'clusterIds': unique_cluster_ids.tolist()
+            })
+            
+        else:
+            # Generate synthetic data (original logic)
+            channel_ids = data.get('channelIds', [179, 181, 183])
+            
+            np.random.seed(42)
+            clusters = []
+            colors = ['#FF6B6B', '#4ECDC4', '#FFD700']
+            centers = [[2.0, 5.0], [8.0, 2.5], [4.0, 2.0]]
+            spreads = [0.8, 0.9, 0.7]
+            
+            for cluster_idx in range(3):
+                cluster_x = np.random.normal(centers[cluster_idx][0], spreads[cluster_idx], 100)
+                cluster_y = np.random.normal(centers[cluster_idx][1], spreads[cluster_idx], 100)
+                
+                # Get spike times for this cluster's channel
+                spike_times = []
+                if spike_times_data is not None and cluster_idx < len(channel_ids):
+                    channel_id = channel_ids[cluster_idx]
+                    
+                    if isinstance(spike_times_data, np.ndarray):
+                        spike_times_list = spike_times_data.tolist() if hasattr(spike_times_data, 'tolist') else list(spike_times_data)
+                    elif isinstance(spike_times_data, dict):
+                        channel_spikes = spike_times_data.get(channel_id) or spike_times_data.get(str(channel_id))
+                        if channel_spikes is not None:
+                            spike_times_list = channel_spikes.tolist() if hasattr(channel_spikes, 'tolist') else list(channel_spikes)
+                        else:
+                            spike_times_list = []
+                    else:
+                        spike_times_list = []
+                    
+                    spike_times = spike_times_list[:100] if len(spike_times_list) >= 100 else spike_times_list
+                
+                while len(spike_times) < 100:
+                    spike_times.append(None)
+                
+                clusters.append({
+                    'clusterId': cluster_idx,
+                    'points': [[float(x), float(y)] for x, y in zip(cluster_x, cluster_y)],
+                    'spikeTimes': spike_times,
+                    'center': centers[cluster_idx],
+                    'color': colors[cluster_idx],
+                    'channelId': channel_ids[cluster_idx] if cluster_idx < len(channel_ids) else None,
+                    'pointCount': 100
+                })
+            
+            print(f"Generated synthetic cluster data for channels: {channel_ids}")
+            
+            return jsonify({
+                'mode': 'synthetic',
+                'clusters': clusters,
+                'numClusters': 3,
+                'pointsPerCluster': 100,
+                'channelIds': channel_ids,
+                'totalPoints': 300
+            })
         
     except Exception as e:
-        print(f"Error generating cluster data: {e}")
+        print(f"Error getting cluster data: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/spike-preview', methods=['POST'])
 def get_spike_preview():
-    """Get waveform preview for a specific spike"""
-    global spike_times_data, data_array
+    """Get waveform preview for a specific spike using provided spike time"""
+    global data_array
     
     try:
         data = request.get_json()
-        spike_index = data.get('spikeIndex', 0)
+        spike_time = data.get('spikeTime')
         channel_id = data.get('channelId', 1)
         window = data.get('window', 10)
         filter_type = data.get('filterType', 'highpass')
+        point_index = data.get('pointIndex', 0)  # For reference only
         
-        if spike_times_data is None:
-            return jsonify({'error': 'No spike times data loaded'}), 400
+        if spike_time is None:
+            return jsonify({'error': 'No spike time provided'}), 400
         
         if data_array is None:
             return jsonify({'error': 'No data loaded'}), 400
         
-        # Get spike times (handle both global and channel-specific)
-        if isinstance(spike_times_data, np.ndarray):
-            # Global spike times
-            spike_times_list = spike_times_data.tolist() if hasattr(spike_times_data, 'tolist') else list(spike_times_data)
-        elif isinstance(spike_times_data, dict):
-            # Channel-specific spike times
-            spike_times_list = spike_times_data.get(channel_id, spike_times_data.get(str(channel_id), []))
-            if hasattr(spike_times_list, 'tolist'):
-                spike_times_list = spike_times_list.tolist()
-        else:
-            spike_times_list = []
-        
-        if not spike_times_list or spike_index >= len(spike_times_list):
-            return jsonify({'error': 'Invalid spike index'}), 400
-        
-        spike_time = int(spike_times_list[spike_index])
+        spike_time = int(spike_time)
         array_index = channel_id - 1
         
         if array_index >= data_array.shape[0] or array_index < 0:
@@ -1002,9 +1088,11 @@ def get_spike_preview():
         # Round to integer for display
         waveform = np.round(waveform).astype(int)
         
+        print(f"Spike preview: CH{channel_id}, time={spike_time}, window={window}, filter={filter_type}")
+        
         return jsonify({
             'waveform': waveform.tolist(),
-            'spikeIndex': spike_index,
+            'pointIndex': point_index,
             'spikeTime': spike_time,
             'channelId': channel_id,
             'window': window,

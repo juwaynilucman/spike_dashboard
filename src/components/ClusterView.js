@@ -594,7 +594,7 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
               onChange={(e) => handleModeChange(e.target.value)}
             >
               <option value="synthetic">Synthetic (Demo)</option>
-              <option value="real">Real Data</option>
+              <option value="real">Kilosort Data</option>
             </select>
           </div>
           <div className="filter-selector">
@@ -772,7 +772,7 @@ const ClusterView = ({ selectedDataset, onNavigateToSpike }) => {
         )}
       </div>
 
-      {/* Channel Mapping Modal for Real Data */}
+      {/* Channel Mapping Modal for Kilosort Data */}
       {showChannelMappingModal && mode === 'real' && clusterData && (
         <div className="channel-mapping-modal-overlay" onClick={() => setShowChannelMappingModal(false)}>
           <div className="channel-mapping-modal" onClick={(e) => e.stopPropagation()}>

@@ -159,13 +159,16 @@ function App() {
     }
   };
 
-  const handleUploadComplete = (uploadResult) => {
+  const handleUploadComplete = async (uploadResult) => {
     console.log('Upload complete:', uploadResult);
     setShowUploadModal(false);
-    fetchDatasets();
-    setTimeout(() => {
-      checkSpikeTimesAvailable();
-    }, 1000);
+    await fetchDatasets();
+
+    if (uploadResult?.filename) {
+      await handleDatasetChange(uploadResult.filename);
+    } else {
+      await checkSpikeTimesAvailable();
+    }
   };
 
   const [datasetToDelete, setDatasetToDelete] = React.useState(null);

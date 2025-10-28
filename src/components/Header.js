@@ -13,8 +13,28 @@ const Header = ({
   selectedView,
   onViewChange,
   selectedSignalType,
-  onSignalTypeChange
+  onSignalTypeChange,
+  algorithms = [],
+  selectedAlgorithm,
+  onAlgorithmChange,
+  onRunAlgorithm,
+  jobStatus,
+  jobIsRunning,
+  isStartingJob
 }) => {
+  const isSelectedAvailable = selectedAlgorithm && algorithms.some(
+    algo => algo.name === selectedAlgorithm && algo.available
+  );
+
+  const formatStatus = (status) => {
+    if (!status || typeof status !== 'string') return status;
+    return status
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  const statusLabel = formatStatus(jobStatus);
+
   return (
     <div className="header">
       <h1>Spike Visualization Dashboard</h1>
@@ -46,6 +66,42 @@ const Header = ({
               <option value="filtered">Filtered Data</option>
               <option value="spikes">Detected Spikes</option>
             </select>
+          </div>
+        )}
+
+        {selectedView === 'signal' && (
+          <div className="algorithm-controls">
+            <label htmlFor="algorithm-select">Spike Sorting:</label>
+            <select
+              id="algorithm-select"
+              className="view-selector algorithm-select"
+              value={selectedAlgorithm || ''}
+              onChange={(e) => onAlgorithmChange && onAlgorithmChange(e.target.value || null)}
+            >
+              <option value="" disabled>Select algorithm</option>
+              {algorithms.map((algo) => (
+                <option
+                  key={algo.name}
+                  value={algo.name}
+                  disabled={!algo.available}
+                >
+                  {algo.displayName || algo.name}
+                  {!algo.available ? ' (Unavailable)' : ''}
+                </option>
+              ))}
+            </select>
+            <button
+              className="algorithm-runner-button"
+              onClick={onRunAlgorithm}
+              disabled={!isSelectedAvailable || jobIsRunning || isStartingJob}
+            >
+              {jobIsRunning ? 'Running…' : isStartingJob ? 'Starting…' : 'Run'}
+            </button>
+            {statusLabel && (
+              <span className={`job-status-indicator ${jobIsRunning ? 'job-status-running' : ''}`}>
+                {statusLabel}
+              </span>
+            )}
           </div>
         )}
 

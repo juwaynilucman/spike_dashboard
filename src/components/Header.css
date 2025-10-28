@@ -58,6 +58,53 @@
   gap: 0.5rem;
 }
 
+.algorithm-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.algorithm-controls .algorithm-select {
+  min-width: 180px;
+}
+
+.algorithm-runner-button {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  border: none;
+  border-radius: 6px;
+  color: #e0e6ed;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.algorithm-runner-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.algorithm-runner-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  box-shadow: none;
+}
+
+.job-status-indicator {
+  color: #e0e6ed;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(148, 163, 184, 0.2);
+}
+
+.job-status-running {
+  background: rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
 .view-selector-container label {
   color: rgba(224, 230, 237, 0.9);
   font-size: 0.9rem;

@@ -6,6 +6,10 @@ import os
 from werkzeug.utils import secure_filename
 import torch
 from scipy.signal import butter, filtfilt
+from typing import Dict, List, Optional, Tuple
+
+from processing.algorithms import AlgorithmResult, AlgorithmUnavailable, register_builtin_algorithm, algorithm_registry
+from processing.jobs import job_manager
 
 app = Flask(__name__)
 CORS(app)
@@ -150,6 +154,30 @@ def apply_filter(data, filter_type='highpass', sampling_rate=30000, order=4):
         print(f"Error applying {filter_type} filter: {e}")
         return data  # Return original data if filtering fails
 
+
+def _butterworth_algorithm_runner(data: np.ndarray, params: Dict[str, Any]) -> AlgorithmResult:
+    """Apply the existing Butterworth filter channel-by-channel using registry interface."""
+
+    filter_type = params.get('filterType', 'highpass')
+    sampling_rate = params.get('samplingRate', 30000)
+    order = params.get('order', 4)
+    if data.size == 0:
+        return AlgorithmResult(filtered=data)
+    filtered_channels = []
+    for idx in range(data.shape[0]):
+        filtered_channels.append(apply_filter(data[idx], filter_type=filter_type, sampling_rate=sampling_rate, order=order))
+    filtered = np.stack(filtered_channels)
+    return AlgorithmResult(filtered=filtered)
+
+
+register_builtin_algorithm(
+    name='butterworth-filter',
+    display_name='Built-in Butterworth filter',
+    description='Run the existing dashboard Butterworth filter in the background job system.',
+    runner=_butterworth_algorithm_runner,
+    parameters={'filterType': 'highpass', 'samplingRate': 30000, 'order': 4},
+)
+
 def load_spike_times(dataset_filename):
     """Load spike times file associated with a dataset using the mapping database"""
     global spike_times_data
@@ -287,60 +315,94 @@ def load_binary_data(filename=None):
         traceback.print_exc()
         return None
 
-def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=0, end_time=20000, data_type='raw', filter_type='highpass'):
+def get_real_data(channels, spike_threshold=None, invert_data=False, start_time=0, end_time=20000, data_type='raw', filter_type='highpass', job_result=None):
+    return _get_real_data(channels, spike_threshold, invert_data, start_time, end_time, data_type, filter_type, job_result)
+
+
+def extract_data_block(channels: List[int], start_time: int, end_time: int) -> Tuple[List[int], np.ndarray]:
     global data_array
-    
+
+    if data_array is None:
+        raise ValueError('Data not loaded')
+
+    valid_channels: List[int] = []
+    blocks: List[np.ndarray] = []
+    for channel_id in channels:
+        array_index = channel_id - 1
+        if 0 <= array_index < data_array.shape[0]:
+            valid_channels.append(channel_id)
+            blocks.append(data_array[array_index, start_time:end_time])
+
+    if not blocks:
+        return valid_channels, np.zeros((0, max(end_time - start_time, 0)))
+
+    return valid_channels, np.stack(blocks)
+
+
+def _get_real_data(channels, spike_threshold=None, invert_data=False, start_time=0, end_time=20000, data_type='raw', filter_type='highpass', job_result=None):
+    global data_array
+
     if data_array is None:
         return None
-    
+
     total_available = data_array.shape[1]
     start_time = max(0, int(start_time))
     end_time = min(total_available, int(end_time))
-    
+
     data = {}
-    
+    job_filtered_map = {}
+    if job_result is not None:
+        job_filtered_map = job_result.filtered_map(channels, start_time, end_time)
+
     for channel_id in channels:
         array_index = channel_id - 1
-        
+
         if array_index >= data_array.shape[0] or array_index < 0:
             continue
-            
+
         channel_data = data_array[array_index, start_time:end_time]
-        
+
         # Apply filtering if requested (for both filtered and spikes mode)
         filtered_data = None
         original_raw_data = channel_data.copy()  # Always preserve original raw data
-        
-        if filter_type != 'none':
-            # Need a larger buffer for filtering to avoid edge effects
-            buffer = 100
-            buffer_start = max(0, start_time - buffer)
-            buffer_end = min(total_available, end_time + buffer)
-            buffered_data = data_array[array_index, buffer_start:buffer_end]
-            
-            # Store the baseline (mean) of the original signal
-            original_mean = np.mean(channel_data)
-            
-            # Apply the selected filter
-            filtered_buffered = apply_filter(buffered_data.astype(float), filter_type=filter_type)
-            
-            # Extract the relevant portion
-            offset = start_time - buffer_start
-            filtered_data = filtered_buffered[offset:offset + len(channel_data)]
-            
-            # Add back the original baseline for filters that remove DC offset
-            # High-pass and band-pass filters remove DC, low-pass preserves it
-            if filter_type in ['highpass', 'bandpass']:
-                filtered_data = filtered_data + original_mean
-            
-            # For spikes mode, replace the raw data with filtered data
-            # For filtered mode, keep both raw and filtered
+
+        if channel_id in job_filtered_map:
+            filtered_data = job_filtered_map[channel_id]
             if data_type == 'spikes':
                 channel_data = np.round(filtered_data).astype(int)
             elif data_type == 'filtered':
-                # Keep original raw data and store filtered data separately
                 channel_data = original_raw_data
-        
+        else:
+            if filter_type != 'none':
+                # Need a larger buffer for filtering to avoid edge effects
+                buffer = 100
+                buffer_start = max(0, start_time - buffer)
+                buffer_end = min(total_available, end_time + buffer)
+                buffered_data = data_array[array_index, buffer_start:buffer_end]
+
+                # Store the baseline (mean) of the original signal
+                original_mean = np.mean(channel_data)
+
+                # Apply the selected filter
+                filtered_buffered = apply_filter(buffered_data.astype(float), filter_type=filter_type)
+
+                # Extract the relevant portion
+                offset = start_time - buffer_start
+                filtered_data = filtered_buffered[offset:offset + len(channel_data)]
+
+                # Add back the original baseline for filters that remove DC offset
+                # High-pass and band-pass filters remove DC, low-pass preserves it
+                if filter_type in ['highpass', 'bandpass']:
+                    filtered_data = filtered_data + original_mean
+
+                # For spikes mode, replace the raw data with filtered data
+                # For filtered mode, keep both raw and filtered
+                if data_type == 'spikes':
+                    channel_data = np.round(filtered_data).astype(int)
+                elif data_type == 'filtered':
+                    # Keep original raw data and store filtered data separately
+                    channel_data = original_raw_data
+
         if invert_data:
             channel_data = -channel_data
             if filtered_data is not None:
@@ -423,20 +485,118 @@ def get_spike_data():
         use_precomputed = data.get('usePrecomputed', False)
         data_type = data.get('dataType', 'raw')  # 'raw', 'filtered', or 'spikes'
         filter_type = data.get('filterType', 'highpass')  # 'none', 'highpass', 'lowpass', 'bandpass'
-        
+        job_id = data.get('jobId')
+
+        job_result = None
+        if job_id:
+            job = job_manager.get_job(job_id)
+            if job and job.status == 'completed' and job.result is not None:
+                job_result = job.result
+
         max_points = 20000
         end_time = min(end_time, start_time + max_points)
 
         if use_precomputed and spike_times_data is not None:
             spike_data = get_precomputed_spike_data(channels, start_time, end_time, filter_type, invert_data, data_type)
         else:
-            spike_data = get_real_data(channels, spike_threshold, invert_data, start_time, end_time, data_type, filter_type)
+            spike_data = get_real_data(
+                channels,
+                spike_threshold,
+                invert_data,
+                start_time,
+                end_time,
+                data_type,
+                filter_type,
+                job_result=job_result,
+            )
         
         return jsonify(spike_data)
         
     except Exception as e:
         print(f"Error in get_spike_data: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spike-sorting/algorithms', methods=['GET'])
+def list_spike_sorting_algorithms():
+    try:
+        return jsonify({'algorithms': algorithm_registry.serialise()})
+    except Exception as e:
+        print(f"Error listing algorithms: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spike-sorting/jobs', methods=['POST'])
+def create_spike_sorting_job():
+    global data_array
+
+    payload = request.get_json() or {}
+    algorithm_name = payload.get('algorithm')
+    channels = payload.get('channels', [])
+    start_time = int(payload.get('startTime', 0))
+    end_time = int(payload.get('endTime', start_time))
+    params = payload.get('params', {})
+
+    if not algorithm_name:
+        return jsonify({'error': 'Algorithm name is required'}), 400
+    if data_array is None:
+        return jsonify({'error': 'No dataset loaded'}), 400
+    if not isinstance(channels, list) or len(channels) == 0:
+        return jsonify({'error': 'At least one channel must be provided'}), 400
+    if end_time <= start_time:
+        return jsonify({'error': 'endTime must be greater than startTime'}), 400
+
+    try:
+        valid_channels, block = extract_data_block(channels, start_time, end_time)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+
+    if len(valid_channels) == 0:
+        return jsonify({'error': 'No valid channels found for requested range'}), 400
+
+    def _data_provider() -> Tuple[List[int], np.ndarray]:
+        return valid_channels, block
+
+    try:
+        job = job_manager.start_job(
+            algorithm_name=algorithm_name,
+            data_provider=_data_provider,
+            params=params,
+            window=(start_time, end_time),
+        )
+        return jsonify(job.to_dict()), 202
+    except AlgorithmUnavailable as e:
+        return jsonify({'error': str(e)}), 400
+    except KeyError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:  # pragma: no cover - unexpected failure guard
+        print(f"Error creating spike sorting job: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/spike-sorting/jobs/<job_id>', methods=['GET'])
+def get_spike_sorting_job(job_id):
+    job = job_manager.get_job(job_id)
+    if not job:
+        return jsonify({'error': 'Job not found'}), 404
+
+    payload = job.to_dict()
+    if job.result and job.result.filtered is not None:
+        preview_width = min(20, job.result.filtered.shape[1])
+        payload['result']['preview'] = {
+            'filtered': job.result.filtered[:, :preview_width].tolist(),
+            'previewWidth': preview_width,
+        }
+    return jsonify(payload)
+
+
+@app.route('/api/spike-sorting/jobs/<job_id>', methods=['DELETE'])
+def cancel_spike_sorting_job(job_id):
+    cancelled = job_manager.cancel_job(job_id)
+    if not cancelled:
+        return jsonify({'error': 'Unable to cancel job'}), 400
+    job = job_manager.get_job(job_id)
+    return jsonify(job.to_dict())
 
 @app.route('/api/spike-times-available', methods=['GET'])
 def spike_times_available():

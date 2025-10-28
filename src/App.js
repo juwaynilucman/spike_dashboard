@@ -27,17 +27,64 @@ function App() {
   const [selectedDataType, setSelectedDataType] = useState('raw'); // 'raw', 'filtered', or 'spikes'
   const [filterType, setFilterType] = useState('highpass'); // 'none', 'highpass', 'lowpass', 'bandpass', 'bandstop'
   const [filteredLineColor, setFilteredLineColor] = useState('#FFD700'); // Color for filtered data line
+  const [availableAlgorithms, setAvailableAlgorithms] = useState([]);
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState(null);
+  const [activeJob, setActiveJob] = useState(null);
+  const [jobStatus, setJobStatus] = useState(null);
+  const [isStartingJob, setIsStartingJob] = useState(false);
 
   const dataCache = React.useRef({});
+  const jobPollRef = React.useRef(null);
+
+  const fetchAlgorithms = React.useCallback(async () => {
+    try {
+      const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+      const response = await fetch(`${apiUrl}/api/spike-sorting/algorithms`);
+
+      if (response.ok) {
+        const data = await response.json();
+        const algorithms = Array.isArray(data.algorithms) ? data.algorithms : [];
+        setAvailableAlgorithms(algorithms);
+        setSelectedAlgorithm((current) => {
+          if (current && algorithms.some(algo => algo.name === current && algo.available)) {
+            return current;
+          }
+          const firstAvailable = algorithms.find(algo => algo.available);
+          if (firstAvailable) {
+            return firstAvailable.name;
+          }
+          return algorithms.length > 0 ? algorithms[0].name : null;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching algorithms:', error);
+    }
+  }, []);
+
+  const resetActiveJob = React.useCallback(() => {
+    if (jobPollRef.current) {
+      clearInterval(jobPollRef.current);
+      jobPollRef.current = null;
+    }
+    setActiveJob(null);
+    setJobStatus(null);
+  }, []);
 
   useEffect(() => {
     const initializeApp = async () => {
+      await fetchAlgorithms();
       await fetchDatasets();
       // Load c46 dataset by default on initial mount
       await handleDatasetChange('c46_data_5percent.pt');
     };
     initializeApp();
-  }, []);
+  }, [fetchAlgorithms]);
+
+  useEffect(() => {
+    return () => {
+      resetActiveJob();
+    };
+  }, [resetActiveJob]);
 
   useEffect(() => {
     if (selectedChannels.length > 0) {
@@ -135,6 +182,7 @@ function App() {
 
     const finalizeDatasetChange = async (channels, points) => {
       setCurrentDataset(datasetName);
+      resetActiveJob();
 
       if (typeof channels === 'number' && typeof points === 'number') {
         setDatasetInfo({
@@ -261,10 +309,11 @@ function App() {
     const buffer = windowSize;
     const fetchStart = Math.max(0, Math.floor(timeRange.start) - buffer);
     const fetchEnd = Math.min(datasetInfo.totalDataPoints, Math.ceil(timeRange.end) + buffer);
-    
-    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}-${invertData}-${usePrecomputedSpikes}-${selectedDataType}-${filterType}`;
+    const jobIdForRequest = activeJob && activeJob.status === 'completed' ? activeJob.id : null;
+
+    const cacheKey = `${fetchStart}-${fetchEnd}-${spikeThreshold}-${invertData}-${usePrecomputedSpikes}-${selectedDataType}-${filterType}-${jobIdForRequest || 'noJob'}`;
     const needsFetch = selectedChannels.some(ch => !dataCache.current[`${ch}-${cacheKey}`]);
-    
+
     if (!needsFetch) {
       const cachedData = {};
       selectedChannels.forEach(ch => {
@@ -290,7 +339,8 @@ function App() {
           endTime: fetchEnd,
           usePrecomputed: usePrecomputedSpikes,
           dataType: selectedDataType,
-          filterType: filterType
+          filterType: filterType,
+          jobId: jobIdForRequest
         })
       });
       
@@ -311,6 +361,101 @@ function App() {
       console.error('Error fetching spike data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const pollJobStatus = (jobId) => {
+    if (!jobId) return;
+
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`${apiUrl}/api/spike-sorting/jobs/${jobId}`);
+        if (response.ok) {
+          const job = await response.json();
+          setActiveJob(job);
+          setJobStatus(job.status === 'failed' && job.error ? job.error : job.status);
+
+          if (job.status === 'completed') {
+            if (jobPollRef.current) {
+              clearInterval(jobPollRef.current);
+              jobPollRef.current = null;
+            }
+            dataCache.current = {};
+            fetchSpikeData();
+          } else if (job.status === 'failed' || job.status === 'cancelled') {
+            if (jobPollRef.current) {
+              clearInterval(jobPollRef.current);
+              jobPollRef.current = null;
+            }
+          }
+        } else {
+          console.error('Failed to poll spike sorting job');
+        }
+      } catch (error) {
+        console.error('Error polling spike sorting job:', error);
+      }
+    };
+
+    if (jobPollRef.current) {
+      clearInterval(jobPollRef.current);
+    }
+
+    poll();
+    jobPollRef.current = setInterval(poll, 1500);
+  };
+
+  const startSpikeSortingJob = async () => {
+    if (!selectedAlgorithm || selectedChannels.length === 0) {
+      return;
+    }
+
+    const selectedMeta = availableAlgorithms.find(algo => algo.name === selectedAlgorithm);
+    if (!selectedMeta || !selectedMeta.available) {
+      console.warn('Selected algorithm is not available');
+      return;
+    }
+
+    const buffer = windowSize;
+    const fetchStart = Math.max(0, Math.floor(timeRange.start) - buffer);
+    const fetchEnd = Math.min(datasetInfo.totalDataPoints, Math.ceil(timeRange.end) + buffer);
+
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+    try {
+      setIsStartingJob(true);
+      resetActiveJob();
+
+      const response = await fetch(`${apiUrl}/api/spike-sorting/jobs`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          algorithm: selectedAlgorithm,
+          channels: selectedChannels,
+          startTime: fetchStart,
+          endTime: fetchEnd,
+          params: {},
+        }),
+      });
+
+      if (response.ok || response.status === 202) {
+        const job = await response.json();
+        setActiveJob(job);
+        setJobStatus(job.status === 'failed' && job.error ? job.error : job.status);
+        pollJobStatus(job.id);
+      } else {
+        const errorBody = await response.json().catch(() => ({}));
+        console.error('Failed to start spike sorting job', errorBody);
+        setJobStatus(errorBody?.error || 'failed');
+      }
+    } catch (error) {
+      console.error('Error starting spike sorting job:', error);
+      setJobStatus('failed');
+    } finally {
+      setIsStartingJob(false);
     }
   };
 
@@ -425,6 +570,13 @@ function App() {
         onViewChange={setSelectedView}
         selectedSignalType={selectedDataType}
         onSignalTypeChange={setSelectedDataType}
+        algorithms={availableAlgorithms}
+        selectedAlgorithm={selectedAlgorithm}
+        onAlgorithmChange={setSelectedAlgorithm}
+        onRunAlgorithm={startSpikeSortingJob}
+        jobStatus={jobStatus}
+        jobIsRunning={Boolean(activeJob && (activeJob.status === 'queued' || activeJob.status === 'running'))}
+        isStartingJob={isStartingJob}
       />
       <div className="main-container">
         {selectedView === 'signal' && (

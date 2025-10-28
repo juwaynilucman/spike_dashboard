@@ -46,6 +46,9 @@ function App() {
         const algorithms = Array.isArray(data.algorithms) ? data.algorithms : [];
         setAvailableAlgorithms(algorithms);
         setSelectedAlgorithm((current) => {
+          if (algorithms.length === 0) {
+            return null;
+          }
           if (current && algorithms.some(algo => algo.name === current && algo.available)) {
             return current;
           }
@@ -53,13 +56,27 @@ function App() {
           if (firstAvailable) {
             return firstAvailable.name;
           }
-          return algorithms.length > 0 ? algorithms[0].name : null;
+          return algorithms[0].name;
         });
       }
     } catch (error) {
       console.error('Error fetching algorithms:', error);
     }
   }, []);
+
+  useEffect(() => {
+    if (availableAlgorithms.length > 0) {
+      return undefined;
+    }
+
+    const retryTimer = setInterval(() => {
+      fetchAlgorithms();
+    }, 4000);
+
+    return () => {
+      clearInterval(retryTimer);
+    };
+  }, [availableAlgorithms.length, fetchAlgorithms]);
 
   const resetActiveJob = React.useCallback(() => {
     if (jobPollRef.current) {

@@ -22,9 +22,7 @@ const DatasetSelector = ({ datasets, currentDataset, onDatasetChange, onDatasetD
   };
 
   const handleSelect = (datasetName) => {
-    if (datasetName !== currentDataset) {
-      onDatasetChange(datasetName);
-    }
+    onDatasetChange(datasetName);
     setIsOpen(false);
   };
 

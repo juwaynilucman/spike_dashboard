@@ -8,11 +8,14 @@ import torch
 from scipy.signal import butter, filtfilt
 from typing import Dict, List, Optional, Tuple
 
-from processing.algorithms import AlgorithmResult, AlgorithmUnavailable, register_builtin_algorithm, algorithm_registry
+from processing.algorithms import AlgorithmResult, AlgorithmUnavailable, register_builtin_algorithm, algorithm_registry, register_torchbci_algorithms
 from processing.jobs import job_manager
 
 app = Flask(__name__)
 CORS(app)
+
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
 
 DATASETS_FOLDER = 'datasets'
 LABELS_FOLDER = os.path.join('datasets', 'labels')
@@ -155,7 +158,7 @@ def apply_filter(data, filter_type='highpass', sampling_rate=30000, order=4):
         return data  # Return original data if filtering fails
 
 
-def _butterworth_algorithm_runner(data: np.ndarray, params: Dict[str, Any]) -> AlgorithmResult:
+def _butterworth_algorithm_runner(data: np.ndarray, params: Dict[str, any]) -> AlgorithmResult:
     """Apply the existing Butterworth filter channel-by-channel using registry interface."""
 
     filter_type = params.get('filterType', 'highpass')
@@ -177,6 +180,8 @@ register_builtin_algorithm(
     runner=_butterworth_algorithm_runner,
     parameters={'filterType': 'highpass', 'samplingRate': 30000, 'order': 4},
 )
+
+register_torchbci_algorithms()
 
 def load_spike_times(dataset_filename):
     """Load spike times file associated with a dataset using the mapping database"""

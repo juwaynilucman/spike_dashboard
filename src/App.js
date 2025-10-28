@@ -75,7 +75,14 @@ function App() {
         const data = await response.json();
         console.log('Available datasets:', data);
         setDatasets(data.datasets);
-        setCurrentDataset(data.current);
+
+        if (Object.prototype.hasOwnProperty.call(data, 'current')) {
+          if (typeof data.current === 'string' && data.current.length > 0) {
+            setCurrentDataset(data.current);
+          } else if (data.current === null) {
+            setCurrentDataset(null);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching datasets:', error);
@@ -119,7 +126,41 @@ function App() {
     }
   };
 
-  const handleDatasetChange = async (datasetName) => {
+  const handleDatasetChange = async (datasetName, options = {}) => {
+    const {
+      skipRequest = false,
+      totalChannels,
+      totalDataPoints
+    } = options;
+
+    const finalizeDatasetChange = async (channels, points) => {
+      setCurrentDataset(datasetName);
+
+      if (typeof channels === 'number' && typeof points === 'number') {
+        setDatasetInfo({
+          totalChannels: channels,
+          totalDataPoints: points
+        });
+      } else {
+        await fetchDatasetInfo();
+      }
+
+      if (datasetName === 'c46_data_5percent.pt') {
+        setSelectedChannels([179, 181, 183]);
+      }
+
+      dataCache.current = {};
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await checkSpikeTimesAvailable();
+      fetchSpikeData();
+    };
+
+    if (skipRequest) {
+      await finalizeDatasetChange(totalChannels, totalDataPoints);
+      return;
+    }
+
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
       const response = await fetch(`${apiUrl}/api/dataset/set`, {
@@ -129,30 +170,22 @@ function App() {
         },
         body: JSON.stringify({ dataset: datasetName })
       });
-      
+
       if (response.ok) {
         const result = await response.json();
         console.log('Dataset changed:', result);
-        setCurrentDataset(datasetName);
-        setDatasetInfo({
-          totalChannels: result.totalChannels,
-          totalDataPoints: result.totalDataPoints
-        });
-        
-        // Set default channels for c46 dataset
-        if (datasetName === 'c46_data_5percent.pt') {
-          setSelectedChannels([179, 181, 183]);
+        await finalizeDatasetChange(result.totalChannels, result.totalDataPoints);
+      } else {
+        let errorMessage = `Failed to change dataset. Status: ${response.status}`;
+        try {
+          const errorBody = await response.json();
+          if (errorBody?.error) {
+            errorMessage = errorBody.error;
+          }
+        } catch (parseError) {
+          // ignore JSON parsing errors
         }
-        
-        dataCache.current = {};
-        
-        // Wait a bit longer for backend to fully load dataset and spike times
-        // then check if precomputed spikes are available
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await checkSpikeTimesAvailable();
-        
-        // Fetch data after everything is initialized
-        fetchSpikeData();
+        console.error(errorMessage);
       }
     } catch (error) {
       console.error('Error changing dataset:', error);
@@ -164,8 +197,16 @@ function App() {
     setShowUploadModal(false);
     await fetchDatasets();
 
+    if (uploadResult?.autoLoadError) {
+      console.warn('Dataset auto-load warning:', uploadResult.autoLoadError);
+    }
+
     if (uploadResult?.filename) {
-      await handleDatasetChange(uploadResult.filename);
+      await handleDatasetChange(uploadResult.filename, {
+        skipRequest: uploadResult.autoLoaded,
+        totalChannels: uploadResult.totalChannels,
+        totalDataPoints: uploadResult.totalDataPoints
+      });
     } else {
       await checkSpikeTimesAvailable();
     }

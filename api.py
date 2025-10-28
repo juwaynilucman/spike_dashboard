@@ -745,7 +745,7 @@ def upload_dataset():
             if spike_times_file.filename != '' and spike_times_file.filename.endswith('.pt'):
                 spike_times_filename = secure_filename(spike_times_file.filename)
                 spike_times_filepath = os.path.join(LABELS_FOLDER, spike_times_filename)
-                
+
                 chunk_size = 4096 * 1024
                 with open(spike_times_filepath, 'wb') as f:
                     while True:
@@ -753,18 +753,45 @@ def upload_dataset():
                         if not chunk:
                             break
                         f.write(chunk)
-                
+
                 print(f"Uploaded spike times to labels folder: {spike_times_filename}")
-                
+
                 add_label_mapping(filename, spike_times_filename)
-        
-        return jsonify({
+
+        auto_loaded = False
+        auto_load_error = None
+        total_channels = None
+        total_data_points = None
+
+        try:
+            load_result = load_binary_data(filename)
+            if load_result is not None:
+                auto_loaded = True
+                total_channels = int(data_array.shape[0])
+                total_data_points = int(data_array.shape[1])
+                print(f"Auto-loaded dataset after upload: {filename} ({total_channels} channels, {total_data_points} samples)")
+            else:
+                auto_load_error = 'Dataset saved but automatic load failed. Select it from the dataset menu to retry.'
+        except Exception as load_error:
+            auto_load_error = str(load_error)
+            print(f"Warning: failed to auto-load dataset {filename} after upload: {auto_load_error}")
+
+        response_payload = {
             'success': True,
             'filename': filename,
             'size': file_size,
             'sizeFormatted': format_file_size(file_size),
-            'spikeTimesFile': spike_times_filename
-        })
+            'spikeTimesFile': spike_times_filename,
+            'autoLoaded': auto_loaded
+        }
+
+        if auto_loaded:
+            response_payload['totalChannels'] = total_channels
+            response_payload['totalDataPoints'] = total_data_points
+        elif auto_load_error:
+            response_payload['autoLoadError'] = auto_load_error
+
+        return jsonify(response_payload)
         
     except Exception as e:
         print(f"Error uploading dataset: {e}")

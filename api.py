@@ -7,8 +7,13 @@ from werkzeug.utils import secure_filename
 import torch
 from scipy.signal import butter, filtfilt
 from typing import Dict, List, Optional, Tuple
-
-from processing.algorithms import AlgorithmResult, AlgorithmUnavailable, register_builtin_algorithm, algorithm_registry, register_torchbci_algorithms
+from processing.algorithms import (
+    AlgorithmResult,
+    AlgorithmUnavailable,
+    algorithm_registry,
+    register_builtin_algorithm,
+    register_torchbci_algorithms,
+)
 from processing.jobs import job_manager
 
 app = Flask(__name__)
@@ -171,7 +176,6 @@ def _butterworth_algorithm_runner(data: np.ndarray, params: Dict[str, any]) -> A
         filtered_channels.append(apply_filter(data[idx], filter_type=filter_type, sampling_rate=sampling_rate, order=order))
     filtered = np.stack(filtered_channels)
     return AlgorithmResult(filtered=filtered)
-
 
 register_builtin_algorithm(
     name='butterworth-filter',

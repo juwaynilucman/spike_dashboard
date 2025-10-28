@@ -190,5 +190,12 @@ def register_builtin_algorithm(
     )
 
 
-# Attempt to register optional algorithms during import.
-register_torchbci_algorithms()
+__all__ = [
+    "AlgorithmResult",
+    "AlgorithmSpec",
+    "AlgorithmUnavailable",
+    "AlgorithmRegistry",
+    "algorithm_registry",
+    "register_builtin_algorithm",
+    "register_torchbci_algorithms",
+]

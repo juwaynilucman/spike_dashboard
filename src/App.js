@@ -454,6 +454,12 @@ function App() {
       setIsStartingJob(true);
       resetActiveJob();
 
+      const defaultParams = { ...(selectedMeta.parameters || {}) };
+      if (Object.prototype.hasOwnProperty.call(defaultParams, 'filterType')) {
+        defaultParams.filterType = filterType;
+      }
+
+
       const response = await fetch(`${apiUrl}/api/spike-sorting/jobs`, {
         method: 'POST',
         headers: {
@@ -464,9 +470,7 @@ function App() {
           channels: selectedChannels,
           startTime: fetchStart,
           endTime: fetchEnd,
-          params: {
-            filterType,
-          },
+          params: defaultParams,
         }),
       });
 

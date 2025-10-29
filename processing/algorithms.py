@@ -103,10 +103,10 @@ def register_torchbci_algorithms() -> None:
     """Attempt to register algorithms sourced from the optional torchbci package."""
 
     try:
-        from torchbci.block.algorithms import JimsAlgorithm  # type: ignore
+        from torchbci.algorithms import JimsAlgorithm  # type: ignore
     except ImportError:
         try:
-            from torchbci.block import JimsAlgorithm  # type: ignore
+            from torchbci.algorithms import JimsAlgorithm  # type: ignore
         except ImportError:
             JimsAlgorithm = None
     try:

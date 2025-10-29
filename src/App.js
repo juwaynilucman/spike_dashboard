@@ -399,8 +399,18 @@ function App() {
               clearInterval(jobPollRef.current);
               jobPollRef.current = null;
             }
-            dataCache.current = {};
-            fetchSpikeData();
+            if (job?.result?.hasFiltered) {
+              setSelectedView('signal');
+              if (selectedDataType !== 'filtered') {
+                setSelectedDataType('filtered');
+              } else {
+                dataCache.current = {};
+                fetchSpikeData();
+              }
+            } else {
+              dataCache.current = {};
+              fetchSpikeData();
+            }
           } else if (job.status === 'failed' || job.status === 'cancelled') {
             if (jobPollRef.current) {
               clearInterval(jobPollRef.current);
@@ -454,7 +464,9 @@ function App() {
           channels: selectedChannels,
           startTime: fetchStart,
           endTime: fetchEnd,
-          params: {},
+          params: {
+            filterType,
+          },
         }),
       });
 
